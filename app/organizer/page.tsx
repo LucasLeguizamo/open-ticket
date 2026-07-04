@@ -116,6 +116,17 @@ async function Dashboard({
       </section>
 
       <section className="space-y-2">
+        <p className="text-neutral-500"># import from URL</p>
+        <p className="text-neutral-600">
+          → paste a Luma / Eventbrite / landing URL and we build the draft for
+          you.{" "}
+          <a className="text-green-500 underline" href="/organizer/import">
+            import from URL →
+          </a>
+        </p>
+      </section>
+
+      <section className="space-y-2">
         <p className="text-neutral-500"># create event (stays in draft)</p>
         <form action={createEvent} className="space-y-2">
           <input

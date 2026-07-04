@@ -17,6 +17,7 @@ import {
   destroySession,
   getSessionOrganizerId,
 } from "@/lib/session";
+import { eventBase } from "@/lib/zod/event";
 
 const credentialsSchema = z.object({
   email: z.string().email().max(254),
@@ -87,16 +88,20 @@ async function requireOrganizer(): Promise<string> {
   return id;
 }
 
-const createEventSchema = z.object({
-  title: z.string().min(3).max(200),
-  description: z.string().max(5000),
-  venue: z.string().max(200),
-  starts_at: z
-    .string()
-    .refine((v) => !Number.isNaN(Date.parse(v)), "invalid date"),
-  currency: z.enum(["USD", "COP"]),
-  image_url: z.union([z.string().url().max(500), z.literal("")]),
-});
+// Derives from the single event definition (lib/zod/event.ts). The form supplies
+// exactly the fields createEvent persists today; venue/imageUrl required-but-emptyable
+// keeps the current form behavior. No field rule is duplicated here.
+const createEventSchema = eventBase
+  .pick({
+    title: true,
+    description: true,
+    startsAt: true,
+    currency: true,
+  })
+  .extend({
+    venue: eventBase.shape.venue.unwrap(),
+    imageUrl: eventBase.shape.imageUrl.unwrap(),
+  });
 
 function slugify(title: string): string {
   const base = title
@@ -116,9 +121,9 @@ export async function createEvent(formData: FormData): Promise<void> {
     title: formData.get("title"),
     description: formData.get("description") ?? "",
     venue: formData.get("venue") ?? "",
-    starts_at: formData.get("starts_at"),
+    startsAt: formData.get("starts_at"),
     currency: formData.get("currency"),
-    image_url: formData.get("image_url") ?? "",
+    imageUrl: formData.get("image_url") ?? "",
   });
   if (!parsed.success) redirect("/organizer?error=evento_invalido");
 
@@ -161,9 +166,9 @@ export async function createEvent(formData: FormData): Promise<void> {
     description: parsed.data.description,
     slug: slugify(parsed.data.title),
     venue: parsed.data.venue || null,
-    startsAt: new Date(parsed.data.starts_at),
+    startsAt: new Date(parsed.data.startsAt),
     currency: parsed.data.currency,
-    imageUrl: parsed.data.image_url || null,
+    imageUrl: parsed.data.imageUrl || null,
     status: "draft",
   });
   await db.insert(ticketType).values(

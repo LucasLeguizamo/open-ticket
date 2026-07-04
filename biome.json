@@ -14,7 +14,8 @@
       "!dist",
       "!build",
       "!.claude",
-      "!db/migrations"
+      "!db/migrations",
+      "!test/fixtures/**/*.html"
     ]
   },
   "formatter": {

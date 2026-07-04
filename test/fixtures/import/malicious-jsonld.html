@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Adversarial JSON-LD: hostile shapes the parser must survive without crashing.
+     Multiple ld+json blocks, one broken (unterminated), one an array-of-arrays,
+     a deeply nested @graph, @type as an array, offers as junk types, price as an
+     object, location as an array. The real Event is buried inside. The parser must
+     find it (or degrade to og:) and NEVER throw. -->
+<meta property="og:title" content="Fallback Title From OG" />
+<meta property="og:image" content="https://cdn.example.com/fallback.png" />
+
+<script type="application/ld+json">{ this is not valid json at all </script>
+
+<script type="application/ld+json">
+[[{"@type":"BreadcrumbList","itemListElement":[]}], {"@type":"WebSite","name":"junk"}]
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": ["Thing", "CreativeWork"], "name": "not an event" },
+    {
+      "@graph": [
+        {
+          "@type": ["Event", "Festival"],
+          "name": "Deeply Nested Fest",
+          "startDate": "2026-11-20T19:00:00Z",
+          "location": [
+            { "@type": "Place", "name": "Main Stage" },
+            { "@type": "Place", "name": "Second Stage" }
+          ],
+          "image": { "@type": "ImageObject", "url": "https://cdn.example.com/nested.png" },
+          "offers": [
+            { "@type": "Offer", "price": { "@type": "PriceSpecification", "value": "30" }, "priceCurrency": "USD" },
+            null,
+            "just a string offer",
+            { "@type": "Offer", "price": "25.00", "priceCurrency": "USD", "name": "Valid Tier" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body></body>
+</html>
