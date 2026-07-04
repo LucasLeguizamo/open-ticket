@@ -11,7 +11,17 @@ $ your-agent: "get me a ticket for the jazz night on Friday, up to $50"
   ✓ payment confirmed            → ticket tkt_9f8e · .ics sent to your inbox
 ```
 
-## Buy tickets with your agent (MCP)
+## Buy tickets with your agent
+
+The fastest path — install the [OpenTicket skills](https://github.com/LucasLeguizamo/openticket-skills) once and your agent knows how to discover and buy on its own:
+
+```bash
+npx skills add LucasLeguizamo/openticket-skills --copy
+```
+
+Then just say: *"find me a ticket for the jazz night on Friday and buy it — up to $50."*
+
+### Or connect via MCP directly
 
 Point any MCP client (Claude, or your own agent) at the server:
 

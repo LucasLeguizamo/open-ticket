@@ -66,6 +66,24 @@ async function AgentContent() {
     <>
       <section className="space-y-2">
         <p className="text-neutral-500">
+          # 0. or install the skills — your agent learns the whole flow
+        </p>
+        <pre className="overflow-x-auto rounded border border-neutral-800 bg-neutral-950 p-4 text-green-400">
+          npx skills add LucasLeguizamo/openticket-skills --copy
+        </pre>
+        <p className="text-neutral-600">
+          search + buy, spend limits, idempotent retries —{" "}
+          <a
+            className="underline hover:text-green-500"
+            href="https://github.com/LucasLeguizamo/openticket-skills"
+          >
+            openticket-skills
+          </a>
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <p className="text-neutral-500">
           # 1. connect your agent (Claude, etc.)
         </p>
         <pre className="overflow-x-auto rounded border border-neutral-800 bg-neutral-950 p-4 text-green-400">

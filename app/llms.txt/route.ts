@@ -10,6 +10,11 @@ export function GET(req: Request): Response {
 > Agent-native ticketing: every ticket is discoverable and buyable by an AI
 > agent. Payments via Stripe (hosted checkout). "Your agent handles the checkout."
 
+## Skills (fastest path)
+- Install once: \`npx skills add LucasLeguizamo/openticket-skills --copy\`
+- Teaches any agent the full flow: discovery, buy within spend_limit, idempotent retries, structured errors.
+- Repo: https://github.com/LucasLeguizamo/openticket-skills
+
 ## Discovery
 - [Events feed (JSON)](${origin}/api/events): published events + ticket types with price (minor units), ISO 4217 currency and available quota.
 - [Live ticker (SSE)](${origin}/api/ticker): public activity stream, no PII.
