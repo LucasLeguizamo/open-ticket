@@ -1,45 +1,44 @@
 /**
- * Página /agents (README paso 1) — la vitrina para agentes y devs. Estética CLI
- * como la landing. Documenta el MCP server, las 4 tools con payload de ejemplo,
- * y los endpoints de descubrimiento (feed JSON, llms.txt, OpenAPI).
+ * /agents page (README step 1) — the showcase for agents and devs. CLI
+ * aesthetic like the landing. Documents the MCP server, the 4 tools with
+ * example payloads, and the discovery endpoints (JSON feed, llms.txt, OpenAPI).
  *
- * URLs con el host real de la request (headers()) → correcto en preview y prod.
+ * URLs use the real request host (headers()) → correct in preview and prod.
  */
 import { headers } from "next/headers";
 import { Suspense } from "react";
 
 export const metadata = {
-  title: "OpenTicket · para agentes",
-  description:
-    "MCP server, feed de eventos y endpoints públicos de OpenTicket.",
+  title: "OpenTicket · for agents",
+  description: "OpenTicket's MCP server, events feed, and public endpoints.",
 };
 
 const TOOLS: { name: string; desc: string; payload: object }[] = [
   {
     name: "search_events",
-    desc: "Busca eventos publicados y sus tipos de ticket (precio + cupo).",
+    desc: "Searches published events and their ticket types (price + availability).",
     payload: { query: "jazz", limit: 20 },
   },
   {
     name: "get_ticket",
-    desc: "Detalle de un tipo de ticket antes de comprar.",
+    desc: "Details of a ticket type before buying.",
     payload: { ticket_type_id: "tt_..." },
   },
   {
     name: "buy_ticket",
-    desc: "Compra respetando spend_limit. Devuelve pending_payment + checkout_url.",
+    desc: "Buys while honoring spend_limit. Returns pending_payment + checkout_url.",
     payload: {
       event_id: "evt_...",
       ticket_type_id: "tt_...",
       quantity: 1,
       buyer_email: "user@example.com",
-      idempotency_key: "generado-por-vos-repetir-en-reintentos",
+      idempotency_key: "generated-by-you-reuse-on-retries",
       spend_limit: { amount_minor: 50000, currency: "USD" },
     },
   },
   {
     name: "set_reminder",
-    desc: "Agenda recordatorio por email + devuelve .ics con alarmas (24h/1h).",
+    desc: "Schedules an email reminder + returns an .ics with alarms (24h/1h).",
     payload: { event_id: "evt_...", buyer_email: "user@example.com" },
   },
 ];
@@ -57,8 +56,8 @@ async function AgentContent() {
 }`;
 
   const links: [string, string][] = [
-    ["Feed de eventos (JSON)", "/api/events"],
-    ["Ticker en vivo (SSE)", "/api/ticker"],
+    ["Events feed (JSON)", "/api/events"],
+    ["Live ticker (SSE)", "/api/ticker"],
     ["llms.txt", "/llms.txt"],
     ["OpenAPI 3.1", "/openapi.json"],
   ];
@@ -67,7 +66,7 @@ async function AgentContent() {
     <>
       <section className="space-y-2">
         <p className="text-neutral-500">
-          # 1. conectá tu agente (Claude, etc.)
+          # 1. connect your agent (Claude, etc.)
         </p>
         <pre className="overflow-x-auto rounded border border-neutral-800 bg-neutral-950 p-4 text-green-400">
           {mcpConfig}
@@ -78,7 +77,7 @@ async function AgentContent() {
       </section>
 
       <section className="space-y-3">
-        <p className="text-neutral-500"># 2. tools disponibles</p>
+        <p className="text-neutral-500"># 2. available tools</p>
         {TOOLS.map((t) => (
           <div
             key={t.name}
@@ -94,13 +93,13 @@ async function AgentContent() {
           </div>
         ))}
         <p className="text-neutral-600">
-          Errores estructurados: sold_out · mandate_exceeded · invalid_intent.
-          Reintentá con la MISMA idempotency_key. Estado final: get_order.
+          Structured errors: sold_out · mandate_exceeded · invalid_intent. Retry
+          with the SAME idempotency_key. Final status: get_order.
         </p>
       </section>
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># 3. descubrimiento sin MCP</p>
+        <p className="text-neutral-500"># 3. discovery without MCP</p>
         <ul className="space-y-1">
           {links.map(([label, href]) => (
             <li key={href}>
@@ -132,16 +131,16 @@ export default function AgentsPage() {
       <header className="space-y-3">
         <p className="text-neutral-500">$ openticket agents --help</p>
         <h1 className="text-2xl font-bold">
-          Comprá tickets programáticamente.
+          Buy tickets programmatically.
           <span className="animate-pulse">▌</span>
         </h1>
         <p className="text-neutral-400">
-          Cada ticket es descubrible y comprable por un agente. Conectá por{" "}
-          <span className="text-green-500">MCP</span> o consumí el feed JSON.
+          Every ticket is discoverable and buyable by an agent. Connect via{" "}
+          <span className="text-green-500">MCP</span> or consume the JSON feed.
         </p>
       </header>
 
-      <Suspense fallback={<p className="text-neutral-600">$ cargando…</p>}>
+      <Suspense fallback={<p className="text-neutral-600">$ loading…</p>}>
         <AgentContent />
       </Suspense>
 

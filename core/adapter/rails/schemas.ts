@@ -1,7 +1,7 @@
 /**
- * Trust boundary (PRD §7): TODO input de agente/humano pasa por estos schemas
- * ANTES de tocar el core. Viven junto al adapter para que el futuro paquete
- * sea autocontenido. `.strict()` = additionalProperties: false.
+ * Trust boundary (PRD §7): ALL agent/human input goes through these schemas
+ * BEFORE touching the core. They live next to the adapter so the future
+ * package is self-contained. `.strict()` = additionalProperties: false.
  */
 import { z } from "zod";
 import { AgentCommerceError } from "../errors";
@@ -9,9 +9,9 @@ import type { PurchaseIntent, Rail } from "../types";
 
 export const moneySchema = z
   .object({
-    // enteros en unidades mínimas — nunca floats (data-model §1)
+    // integers in minor units — never floats (data-model §1)
     amount_minor: z.number().int().min(0).max(100_000_000_000),
-    currency: z.string().regex(/^[A-Z]{3}$/, "ISO 4217 en mayúsculas"),
+    currency: z.string().regex(/^[A-Z]{3}$/, "uppercase ISO 4217"),
   })
   .strict();
 
@@ -20,29 +20,29 @@ export const buyTicketInputSchema = z
     event_id: z.string().min(1).max(64),
     ticket_type_id: z.string().min(1).max(64),
     quantity: z.number().int().min(1).max(10),
-    // z.string().email() rechaza \r\n → sin header injection en el email
+    // z.string().email() rejects \r\n → no header injection in the email
     buyer_email: z.string().email().max(254),
     buyer_name: z.string().max(200).optional(),
     idempotency_key: z.string().min(8).max(128),
     /**
-     * OBLIGATORIO en rails con authorization="spend_limit" (lo exige el core).
-     * Autodeclarado: documenta intención, no es control de seguridad (P5).
+     * REQUIRED on rails with authorization="spend_limit" (enforced by the core).
+     * Self-declared: documents intent, not a security control (P5).
      */
     spend_limit: moneySchema.optional(),
-    /** Opaco: mandate AP2 / receipt 402 / SPT. Vacío = pago hospedado. */
+    /** Opaque: AP2 mandate / 402 receipt / SPT. Empty = hosted payment. */
     payment_context: z.record(z.unknown()).optional(),
   })
   .strict();
 
 export type BuyTicketInput = z.infer<typeof buyTicketInputSchema>;
 
-/** Parsea y normaliza a PurchaseIntent, o tira invalid_intent con los issues. */
+/** Parses and normalizes into a PurchaseIntent, or throws invalid_intent with the issues. */
 export function parseBuyTicketInput(raw: unknown, rail: Rail): PurchaseIntent {
   const parsed = buyTicketInputSchema.safeParse(raw);
   if (!parsed.success) {
     throw new AgentCommerceError(
       "invalid_intent",
-      "input inválido",
+      "invalid input",
       parsed.error.issues.map((i) => ({
         path: i.path.join("."),
         message: i.message,

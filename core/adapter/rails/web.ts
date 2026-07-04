@@ -1,6 +1,6 @@
 /**
- * Rail WEB: compra humana desde la página del evento.
- * authorization "none" (el humano confirma pagando el checkout hospedado);
+ * WEB rail: human purchase from the event page.
+ * authorization "none" (the human confirms by paying the hosted checkout);
  * settlement stripe_hosted.
  */
 import type { PurchaseResult, RailAdapter } from "../types";

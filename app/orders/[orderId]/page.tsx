@@ -1,22 +1,22 @@
 /**
- * Página de orden — destino del success/cancel del checkout hospedado y del
- * link del email. Estética CLI (tech-stack: landing dev-native llega en F1).
- * Cache Components: la data de la orden es dinámica → va bajo <Suspense>.
+ * Order page — destination of the hosted checkout's success/cancel and of the
+ * email link. CLI aesthetic (tech-stack: dev-native landing arrives in F1).
+ * Cache Components: order data is dynamic → goes under <Suspense>.
  */
 import { Suspense } from "react";
 import { getPurchaseCore } from "@/lib/context";
 
 const STATUS_LINE: Record<string, string> = {
-  pending_payment: "⧗ pendiente de pago",
-  confirmed: "✓ confirmada",
-  expired: "✗ expirada (cupo liberado)",
-  cancelled: "✗ cancelada",
-  refunded: "↩ reembolsada",
+  pending_payment: "⧗ pending payment",
+  confirmed: "✓ confirmed",
+  expired: "✗ expired (quota released)",
+  cancelled: "✗ cancelled",
+  refunded: "↩ refunded",
 };
 
 async function OrderDetail({ orderId }: { orderId: string }) {
   const result = await getPurchaseCore().getOrderResult(orderId);
-  if (!result) return <p className="mt-4">error: orden no encontrada</p>;
+  if (!result) return <p className="mt-4">error: order not found</p>;
   return (
     <div className="mt-4 space-y-3">
       <p>
@@ -34,10 +34,10 @@ async function OrderDetail({ orderId }: { orderId: string }) {
       {result.status === "pending_payment" && result.checkoutUrl && (
         <p>
           <a className="text-green-500 underline" href={result.checkoutUrl}>
-            → completar pago
+            → complete payment
           </a>{" "}
           <span className="text-neutral-500">
-            (reserva hasta {result.expiresAt?.toISOString()})
+            (reserved until {result.expiresAt?.toISOString()})
           </span>
         </p>
       )}
@@ -53,7 +53,7 @@ async function OrderDetail({ orderId }: { orderId: string }) {
       {result.icsPath && (
         <p>
           <a className="text-green-500 underline" href={result.icsPath}>
-            → descargar .ics (recordatorios 24h y 1h antes)
+            → download .ics (reminders 24h and 1h before)
           </a>
         </p>
       )}
@@ -78,9 +78,7 @@ export default function OrderPage({
 }) {
   return (
     <main className="mx-auto max-w-2xl p-8 text-sm">
-      <Suspense
-        fallback={<p className="text-neutral-500">$ cargando orden…</p>}
-      >
+      <Suspense fallback={<p className="text-neutral-500">$ loading order…</p>}>
         <OrderView params={params} />
       </Suspense>
     </main>

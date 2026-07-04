@@ -11,26 +11,26 @@ function renderHtml(input: TicketEmailInput): string {
   const icsUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${input.icsPath}`;
   return `<!doctype html>
 <html><body style="font-family:ui-monospace,monospace;background:#0a0a0a;color:#e5e5e5;padding:24px">
-  <h1 style="font-size:18px">&gt; openticket — orden confirmada ✓</h1>
+  <h1 style="font-size:18px">&gt; openticket — order confirmed ✓</h1>
   <p><strong>${input.eventTitle}</strong><br/>
   ${input.eventStartsAt.toUTCString()}${input.venue ? ` · ${input.venue}` : ""}</p>
-  <p>Tus tickets:</p>
+  <p>Your tickets:</p>
   <ul>${codes}</ul>
   <p>Total: ${amount} ${input.amount.currency}</p>
-  <p>El evento va adjunto como <code>.ics</code> (con recordatorios 24h y 1h antes).<br/>
-  También: <a href="${icsUrl}" style="color:#4ade80">${icsUrl}</a></p>
-  <p style="color:#737373">orden ${input.orderId} · openticket</p>
+  <p>The event is attached as an <code>.ics</code> calendar file (with reminders 24h and 1h before).<br/>
+  Also available at: <a href="${icsUrl}" style="color:#4ade80">${icsUrl}</a></p>
+  <p style="color:#737373">order ${input.orderId} · openticket</p>
 </body></html>`;
 }
 
-/** Fallback de desarrollo: imprime el email en consola. No bloquea la demo. */
+/** Development fallback: prints the email to the console. Never blocks the demo. */
 const consoleMailer: MailerPort = {
   async sendTicketEmail(input) {
     console.log(
       [
         "─".repeat(60),
         `[mailer:console] Ticket email → ${input.to}`,
-        `  evento : ${input.eventTitle} @ ${input.eventStartsAt.toISOString()}`,
+        `  event  : ${input.eventTitle} @ ${input.eventStartsAt.toISOString()}`,
         `  tickets: ${input.tickets.map((t) => t.code).join(", ")}`,
         `  total  : ${input.amount.amountMinor} ${input.amount.currency} (minor)`,
         `  .ics   : ${input.icsPath} (${input.icsContent.length} bytes)`,
@@ -40,7 +40,7 @@ const consoleMailer: MailerPort = {
   },
 };
 
-/** MailerPort real (Resend) si hay RESEND_API_KEY; si no, consola. */
+/** Real MailerPort (Resend) when RESEND_API_KEY is set; console otherwise. */
 export function createMailer(): MailerPort {
   const key = process.env.RESEND_API_KEY;
   if (!key) return consoleMailer;
@@ -51,7 +51,7 @@ export function createMailer(): MailerPort {
       const { error } = await resend.emails.send({
         from,
         to: input.to,
-        subject: `Tu ticket: ${input.eventTitle}`,
+        subject: `Your tickets for ${input.eventTitle}`,
         html: renderHtml(input),
         attachments: [
           {

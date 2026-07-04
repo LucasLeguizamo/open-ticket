@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "OpenTicket — agent-native ticketing",
   description:
-    "Your agent handles the checkout. Tickets comprables por agentes vía MCP/ACP, pagados con Stripe.",
+    "Your agent handles the checkout. Tickets buyable by agents via MCP/ACP, paid with Stripe.",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
+    <html lang="en">
       <body className="min-h-screen font-mono antialiased">{children}</body>
     </html>
   );

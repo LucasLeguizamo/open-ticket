@@ -1,4 +1,4 @@
-/** Página pública del evento (US-001 AC: URL corta) + compra web (US-004). */
+/** Public event page (US-001 AC: short URL) + web purchase (US-004). */
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getPublishedEventBySlug } from "@/lib/catalog";
@@ -8,11 +8,11 @@ const inputCls =
   "rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-200";
 
 const ERRORS: Record<string, string> = {
-  sold_out: "cupo agotado",
-  invalid_intent: "revisa email y cantidad",
-  payment_failed: "no se pudo iniciar el pago, intenta de nuevo",
-  event_unavailable: "el evento ya no está disponible",
-  internal: "error inesperado, intenta de nuevo",
+  sold_out: "sold out",
+  invalid_intent: "check email and quantity",
+  payment_failed: "could not start the payment, try again",
+  event_unavailable: "the event is no longer available",
+  internal: "unexpected error, try again",
 };
 
 async function EventDetail({
@@ -66,7 +66,7 @@ async function EventDetail({
               <strong>{t.name}</strong> — {(t.price_minor / 100).toFixed(2)}{" "}
               {t.currency}{" "}
               <span className="text-neutral-500">
-                ({t.available} disponibles)
+                ({t.available} available)
               </span>
             </p>
             <input type="hidden" name="slug" value={ev.slug} />
@@ -93,7 +93,7 @@ async function EventDetail({
                 type="submit"
                 disabled={t.available === 0}
               >
-                {t.available === 0 ? "sold out" : "comprar →"}
+                {t.available === 0 ? "sold out" : "buy →"}
               </button>
             </div>
           </form>
@@ -101,7 +101,7 @@ async function EventDetail({
       </section>
 
       <footer className="text-neutral-600">
-        ¿Eres un agente? Usa el MCP: <code>/api/mcp</code> · event_id:{" "}
+        Are you an agent? Use the MCP: <code>/api/mcp</code> · event_id:{" "}
         <code>{ev.id}</code>
       </footer>
     </>
@@ -114,9 +114,7 @@ export default function EventPage(props: {
 }) {
   return (
     <main className="mx-auto max-w-2xl space-y-8 p-8 text-sm">
-      <Suspense
-        fallback={<p className="text-neutral-500">$ cargando evento…</p>}
-      >
+      <Suspense fallback={<p className="text-neutral-500">$ loading event…</p>}>
         <EventDetail params={props.params} searchParams={props.searchParams} />
       </Suspense>
     </main>

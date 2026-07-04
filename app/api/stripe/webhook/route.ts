@@ -1,10 +1,11 @@
 /**
- * Webhook de Stripe (fix P3) — el ÚNICO camino de confirmación de pago.
+ * Stripe webhook (fix P3) — the ONLY path for payment confirmation.
  *
- * Orden deliberado: procesar PRIMERO, marcar processed_stripe_event DESPUÉS.
- * confirmAndIssue/expireOrder ya son idempotentes (UPDATE condicional = lock),
- * así que reprocesar un evento es inocuo; lo contrario (marcar y fallar antes
- * de emitir) perdería el fulfillment porque el retry de Stripe se deduplicaría.
+ * Deliberate ordering: process FIRST, mark processed_stripe_event AFTER.
+ * confirmAndIssue/expireOrder are already idempotent (conditional UPDATE =
+ * lock), so reprocessing an event is harmless; the opposite (mark then fail
+ * before issuing) would lose the fulfillment because Stripe's retry would be
+ * deduplicated.
  */
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
@@ -15,14 +16,14 @@ export async function POST(req: Request): Promise<NextResponse> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     return NextResponse.json(
-      { error: "STRIPE_WEBHOOK_SECRET no configurado" },
+      { error: "STRIPE_WEBHOOK_SECRET not configured" },
       { status: 500 },
     );
   }
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
     return NextResponse.json(
-      { error: "falta stripe-signature" },
+      { error: "missing stripe-signature" },
       { status: 400 },
     );
   }
@@ -36,7 +37,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       secret,
     );
   } catch {
-    return NextResponse.json({ error: "firma inválida" }, { status: 400 });
+    return NextResponse.json({ error: "invalid signature" }, { status: 400 });
   }
 
   const core = getPurchaseCore();
@@ -44,7 +45,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     case "checkout.session.completed": {
       const session = stripeEvent.data.object;
       const orderId = session.metadata?.order_id;
-      if (!orderId) break; // sesión ajena a OpenTicket
+      if (!orderId) break; // session not from OpenTicket
       const paymentIntentId =
         typeof session.payment_intent === "string"
           ? session.payment_intent
@@ -58,7 +59,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       break;
     }
     default:
-      break; // tipos no suscritos: ack y listo
+      break; // unsubscribed types: ack and done
   }
 
   const firstTime = await getStore().markStripeEventProcessed(stripeEvent.id);

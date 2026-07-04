@@ -1,16 +1,16 @@
 /**
- * Rail MCP: adaptador puro para la tool `buy_ticket` (adapter doc §6).
- * authorization "spend_limit" (obligatorio sin mandate, Q2); settlement hosted.
+ * MCP rail: pure adapter for the `buy_ticket` tool (adapter doc §6).
+ * authorization "spend_limit" (required without a mandate, Q2); hosted settlement.
  *
- * El SERVER MCP (route handler streamable HTTP) es F1 — este adaptador ya está
- * listo para montarse ahí sin tocar el core.
+ * The MCP SERVER (streamable HTTP route handler) is F1 — this adapter is
+ * already ready to mount there without touching the core.
  */
 import type { PurchaseResult, RailAdapter } from "../types";
 import { parseBuyTicketInput } from "./schemas";
 import { formatPublicResult, type WebPurchaseResponse } from "./web";
 
 export interface McpBuyTicketResponse extends WebPurchaseResponse {
-  /** cómo saber si el pago hospedado ya se confirmó (adapter §6 salida v1) */
+  /** how to find out whether the hosted payment was confirmed (adapter §6 v1 output) */
   poll: string;
 }
 

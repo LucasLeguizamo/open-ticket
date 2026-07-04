@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Harness de automejora — una pasada que verifica TODO el flujo del repo.
-# Uso: pnpm harness   (ciclo: correr → arreglar FAILs → repetir hasta verde)
+# Self-improvement harness — one pass that verifies the ENTIRE repo flow.
+# Usage: pnpm harness   (loop: run → fix FAILs → repeat until green)
 #
-# Estados:
+# Statuses:
 #   PASS    ok
-#   FAIL    código roto → arreglar y re-correr (exit 1)
-#   BLOCKED falta config/credencial externa (lista al final; no es bug)
+#   FAIL    broken code → fix and re-run (exit 1)
+#   BLOCKED missing external config/credential (listed at the end; not a bug)
 #
-# ponytail: bash+curl, sin framework. El server se levanta desde .next-build
-# (nunca toca el .next del dev activo — ver memoria 2026-07-02).
+# ponytail: bash+curl, no framework. The server boots from .next-build
+# (never touches the .next of an active dev server — see memory 2026-07-02).
 set -u
 cd "$(dirname "$0")/.."
 
@@ -20,7 +20,7 @@ RESULTS=()
 FAILS=0
 BLOCKED=()
 
-report() { # status name [nota]
+report() { # status name [note]
   RESULTS+=("$(printf '%-8s %-24s %s' "$1" "$2" "${3:-}")")
   [ "$1" = "FAIL" ] && FAILS=$((FAILS + 1))
   [ "$1" = "BLOCKED" ] && BLOCKED+=("$2 — ${3:-}")
@@ -43,9 +43,9 @@ expect() { # name want_code needle curl_args...
   local code
   code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 20 "$@")
   if [ "$code" != "$want" ]; then
-    report FAIL "$name" "HTTP $code (esperaba $want)"
+    report FAIL "$name" "HTTP $code (expected $want)"
   elif [ -n "$needle" ] && ! grep -q "$needle" "$BODY"; then
-    report FAIL "$name" "respuesta sin '$needle'"
+    report FAIL "$name" "response missing '$needle'"
   else
     report PASS "$name"
   fi
@@ -59,30 +59,30 @@ trap cleanup EXIT
 
 echo "── OpenTicket harness · $(date '+%Y-%m-%d %H:%M') ──"
 
-# 0. Credenciales externas (lo que depende de Lucas, no del código)
+# 0. External credentials (things that depend on Lucas, not on the code)
 STRIPE_KEY=$(grep '^STRIPE_SECRET_KEY=' .env | cut -d= -f2-)
 if [ -z "$STRIPE_KEY" ] || [ "$STRIPE_KEY" = "sk_test_xxx" ]; then
-  report BLOCKED "env:stripe" "STRIPE_SECRET_KEY placeholder en .env"
+  report BLOCKED "env:stripe" "STRIPE_SECRET_KEY is a placeholder in .env"
 elif curl -s -o /dev/null -w '%{http_code}' --max-time 10 -u "$STRIPE_KEY:" https://api.stripe.com/v1/balance | grep -q 200; then
   report PASS "env:stripe"
 else
-  report BLOCKED "env:stripe" "la clave Stripe no autentica contra la API (pagos darán payment_failed)"
+  report BLOCKED "env:stripe" "Stripe key does not authenticate against the API (payments will return payment_failed)"
 fi
 grep -q '^RESEND_API_KEY=..*' .env \
   && report PASS "env:resend" \
-  || report BLOCKED "env:resend" "RESEND_API_KEY vacía — emails van a consola (no bloquea demo)"
+  || report BLOCKED "env:resend" "RESEND_API_KEY is empty — emails go to the console (does not block the demo)"
 
-# 1-4. Calidad de código
+# 1-4. Code quality
 stage "lint" pnpm lint
 stage "test:unit" pnpm test
 if pg_isready -h localhost -q 2>/dev/null; then
   stage "test:integration" pnpm test:integration
 else
-  report BLOCKED "test:integration" "Postgres local apagado (brew services start postgresql@16)"
+  report BLOCKED "test:integration" "local Postgres is down (brew services start postgresql@16)"
 fi
 stage "build" pnpm build:check
 
-# 5. Server real desde .next-build
+# 5. Real server from .next-build
 echo "▸ server ($BASE)"
 NEXT_DIST_DIR=.next-build ./node_modules/.bin/next start -p "$PORT" >/dev/null 2>&1 &
 SERVER_PID=$!
@@ -93,33 +93,33 @@ for _ in $(seq 1 30); do
 done
 
 if [ -z "$up" ]; then
-  report FAIL "server" "no levantó en ${PORT} tras 30s"
+  report FAIL "server" "did not come up on ${PORT} after 30s"
 else
   report PASS "server"
-  # 6. Superficie agent-native (README pasos 1-4, 6, 7)
+  # 6. Agent-native surface (README steps 1-4, 6, 7)
   expect "GET /" 200 "" "$BASE/"
   expect "GET /agents" 200 "" "$BASE/agents"
   expect "GET /api/events" 200 '"events"' "$BASE/api/events"
   expect "GET /llms.txt" 200 "" "$BASE/llms.txt"
   expect "GET /openapi.json" 200 '"openapi"' "$BASE/openapi.json"
   expect "GET /api/ticker" 200 "" "$BASE/api/ticker"
-  expect "subscribe válido" 200 "subscribed" -X POST -H 'content-type: application/json' \
+  expect "subscribe valid" 200 "subscribed" -X POST -H 'content-type: application/json' \
     -d '{"email":"harness@openticket.test"}' "$BASE/api/newsletter/subscribe"
-  expect "subscribe basura" 400 "" -X POST -H 'content-type: application/json' \
+  expect "subscribe garbage" 400 "" -X POST -H 'content-type: application/json' \
     -d '{"email":"nope"}' "$BASE/api/newsletter/subscribe"
   MCP_HDR=(-H 'content-type: application/json' -H 'accept: application/json, text/event-stream')
   expect "mcp tools/list" 200 "buy_ticket" -X POST "${MCP_HDR[@]}" \
     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' "$BASE/api/mcp"
-  expect "mcp buy sin key" 200 "unauthorized" -X POST "${MCP_HDR[@]}" \
+  expect "mcp buy without key" 200 "unauthorized" -X POST "${MCP_HDR[@]}" \
     -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"buy_ticket","arguments":{"event_id":"evt_x","ticket_type_id":"tt_x","quantity":1,"buyer_email":"a@t.co","idempotency_key":"harness-noauth","spend_limit":{"amount_minor":1,"currency":"COP"}}}}' \
     "$BASE/api/mcp"
 
-  # 7. Carrera de agentes (F1.5) contra el server del harness
+  # 7. Agent race (F1.5) against the harness server
   echo "▸ agent:race"
   RACE_OUT=$(MCP_URL="$BASE/api/mcp" AGENTS=3 pnpm agent:race 2>&1)
   RACE_CODE=$?
   if echo "$RACE_OUT" | grep -q "payment_failed"; then
-    report BLOCKED "agent:race" "compra rebota en payment_failed → falta clave Stripe funcional"
+    report BLOCKED "agent:race" "purchase bounces with payment_failed → a working Stripe key is missing"
   elif [ $RACE_CODE -eq 0 ]; then
     report PASS "agent:race"
   else
@@ -129,16 +129,16 @@ fi
 
 # ── Scoreboard ──
 echo
-echo "── resultado ──"
+echo "── results ──"
 printf '%s\n' "${RESULTS[@]}"
 if [ ${#BLOCKED[@]} -gt 0 ]; then
   echo
-  echo "── pendiente de tu parte (no es bug) ──"
+  echo "── waiting on you (not a bug) ──"
   printf '  · %s\n' "${BLOCKED[@]}"
 fi
 echo
 if [ $FAILS -gt 0 ]; then
-  echo "✗ $FAILS FAIL — arreglar y volver a correr: pnpm harness"
+  echo "✗ $FAILS FAIL — fix and run again: pnpm harness"
   exit 1
 fi
-echo "✓ todo verde (fuera de lo BLOCKED)"
+echo "✓ all green (aside from BLOCKED)"

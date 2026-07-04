@@ -1,5 +1,5 @@
 /**
- * Trust boundary (R6): el input del agente es NO confiable.
+ * Trust boundary (R6): agent input is UNTRUSTED.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -16,41 +16,41 @@ const valid = {
 };
 
 describe("buyTicketInputSchema", () => {
-  it("acepta input mínimo válido", () => {
+  it("accepts minimal valid input", () => {
     expect(buyTicketInputSchema.safeParse(valid).success).toBe(true);
   });
 
   it.each([
-    ["quantity negativa", { ...valid, quantity: -5 }],
+    ["negative quantity", { ...valid, quantity: -5 }],
     ["quantity 0", { ...valid, quantity: 0 }],
     ["quantity 11", { ...valid, quantity: 11 }],
-    ["quantity float", { ...valid, quantity: 1.5 }],
-    ["email inválido", { ...valid, buyer_email: "nope" }],
+    ["float quantity", { ...valid, quantity: 1.5 }],
+    ["invalid email", { ...valid, buyer_email: "nope" }],
     [
-      "email con CRLF (header injection)",
+      "email with CRLF (header injection)",
       { ...valid, buyer_email: "a@b.co\r\nBcc: x@y.z" },
     ],
-    ["idempotency_key corta", { ...valid, idempotency_key: "abc" }],
-    ["prop extra (strict)", { ...valid, admin: true }],
-    ["event_id vacío", { ...valid, event_id: "" }],
-  ])("rechaza %s", (_name, input) => {
+    ["short idempotency_key", { ...valid, idempotency_key: "abc" }],
+    ["extra prop (strict)", { ...valid, admin: true }],
+    ["empty event_id", { ...valid, event_id: "" }],
+  ])("rejects %s", (_name, input) => {
     expect(buyTicketInputSchema.safeParse(input).success).toBe(false);
   });
 });
 
 describe("moneySchema", () => {
-  it("acepta minor units enteras + ISO 4217", () => {
+  it("accepts integer minor units + ISO 4217", () => {
     expect(
       moneySchema.safeParse({ amount_minor: 4500, currency: "USD" }).success,
     ).toBe(true);
   });
 
   it.each([
-    ["monto negativo", { amount_minor: -1, currency: "USD" }],
+    ["negative amount", { amount_minor: -1, currency: "USD" }],
     ["float", { amount_minor: 45.5, currency: "USD" }],
-    ["moneda minúscula", { amount_minor: 1, currency: "usd" }],
-    ["moneda inventada", { amount_minor: 1, currency: "US" }],
-  ])("rechaza %s", (_name, input) => {
+    ["lowercase currency", { amount_minor: 1, currency: "usd" }],
+    ["made-up currency", { amount_minor: 1, currency: "US" }],
+  ])("rejects %s", (_name, input) => {
     expect(moneySchema.safeParse(input).success).toBe(false);
   });
 });

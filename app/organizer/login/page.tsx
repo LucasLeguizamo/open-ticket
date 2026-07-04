@@ -1,11 +1,11 @@
-/** Login / registro de organizadores — email + contraseña (FR 11). */
+/** Organizer login / signup — email + password (FR 11). */
 import { Suspense } from "react";
 import { login, signup } from "../actions";
 
 const ERRORS: Record<string, string> = {
-  credenciales: "email o contraseña incorrectos",
-  email_ya_registrado: "ese email ya tiene cuenta",
-  datos_invalidos: "revisa email (válido) y contraseña (mínimo 8 caracteres)",
+  credenciales: "wrong email or password",
+  email_ya_registrado: "that email already has an account",
+  datos_invalidos: "check email (valid) and password (minimum 8 characters)",
 };
 
 const inputCls =
@@ -25,7 +25,7 @@ async function LoginForms({
         </p>
       )}
       <section className="space-y-2">
-        <p className="text-neutral-500"># ya tengo cuenta</p>
+        <p className="text-neutral-500"># I already have an account</p>
         <form action={login} className="space-y-2">
           <input
             className={inputCls}
@@ -38,7 +38,7 @@ async function LoginForms({
             className={inputCls}
             name="password"
             type="password"
-            placeholder="contraseña"
+            placeholder="password"
             minLength={8}
             required
           />
@@ -51,12 +51,12 @@ async function LoginForms({
         </form>
       </section>
       <section className="space-y-2">
-        <p className="text-neutral-500"># crear cuenta de organizador</p>
+        <p className="text-neutral-500"># create an organizer account</p>
         <form action={signup} className="space-y-2">
           <input
             className={inputCls}
             name="name"
-            placeholder="nombre / organización"
+            placeholder="name / organization"
             minLength={2}
             required
           />
@@ -71,7 +71,7 @@ async function LoginForms({
             className={inputCls}
             name="password"
             type="password"
-            placeholder="contraseña (mín. 8)"
+            placeholder="password (min. 8)"
             minLength={8}
             required
           />

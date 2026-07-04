@@ -1,4 +1,4 @@
-/** Panel del organizador: sus eventos + form de creación (US-001). */
+/** Organizer dashboard: their events + creation form (US-001). */
 import { desc, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -11,9 +11,8 @@ const inputCls =
   "w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-200";
 
 const ERRORS: Record<string, string> = {
-  evento_invalido: "revisa título (mín. 3), fecha y URL de imagen",
-  tickets_invalidos:
-    "cada tipo de ticket necesita nombre, precio ≥ 0 y cupo ≥ 1",
+  evento_invalido: "check title (min. 3), date and image URL",
+  tickets_invalidos: "each ticket type needs a name, price ≥ 0 and quota ≥ 1",
 };
 
 async function Dashboard({
@@ -61,10 +60,10 @@ async function Dashboard({
       )}
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># mis eventos</p>
+        <p className="text-neutral-500"># my events</p>
         {events.length === 0 && (
           <p className="text-neutral-600">
-            → (vacío) crea tu primer evento abajo
+            → (empty) create your first event below
           </p>
         )}
         <ul className="space-y-2">
@@ -95,7 +94,7 @@ async function Dashboard({
                   {tts
                     .map(
                       (t) =>
-                        `${t.name} ${(t.priceMinor / 100).toFixed(2)} ${e.currency} · ${t.issued}/${t.quota} vendidos`,
+                        `${t.name} ${(t.priceMinor / 100).toFixed(2)} ${e.currency} · ${t.issued}/${t.quota} sold`,
                     )
                     .join(" — ")}
                 </p>
@@ -106,7 +105,7 @@ async function Dashboard({
                       className="rounded bg-green-600 px-3 py-1 font-bold text-black"
                       type="submit"
                     >
-                      publicar →
+                      publish →
                     </button>
                   </form>
                 )}
@@ -117,25 +116,25 @@ async function Dashboard({
       </section>
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># crear evento (queda en draft)</p>
+        <p className="text-neutral-500"># create event (stays in draft)</p>
         <form action={createEvent} className="space-y-2">
           <input
             className={inputCls}
             name="title"
-            placeholder="título"
+            placeholder="title"
             minLength={3}
             required
           />
           <textarea
             className={inputCls}
             name="description"
-            placeholder="descripción"
+            placeholder="description"
             rows={3}
           />
           <input
             className={inputCls}
             name="venue"
-            placeholder="venue (opcional)"
+            placeholder="venue (optional)"
           />
           <div className="flex gap-2">
             <input
@@ -153,17 +152,17 @@ async function Dashboard({
             className={inputCls}
             name="image_url"
             type="url"
-            placeholder="URL de imagen (opcional)"
+            placeholder="image URL (optional)"
           />
           <p className="text-neutral-600">
-            # tipos de ticket (nombre · precio · cupo)
+            # ticket types (name · price · quota)
           </p>
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex gap-2">
               <input
                 className={inputCls}
                 name="tt_name"
-                placeholder={i === 0 ? "General" : "(opcional)"}
+                placeholder={i === 0 ? "General" : "(optional)"}
               />
               <input
                 className={inputCls}
@@ -186,7 +185,7 @@ async function Dashboard({
             className="rounded bg-green-600 px-4 py-2 font-bold text-black"
             type="submit"
           >
-            crear evento →
+            create event →
           </button>
         </form>
       </section>
@@ -201,7 +200,7 @@ export default function OrganizerPage({
 }) {
   return (
     <main className="mx-auto max-w-2xl space-y-8 p-8 text-sm">
-      <Suspense fallback={<p className="text-neutral-500">$ cargando…</p>}>
+      <Suspense fallback={<p className="text-neutral-500">$ loading…</p>}>
         <Dashboard searchParams={searchParams} />
       </Suspense>
     </main>

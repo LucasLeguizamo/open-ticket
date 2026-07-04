@@ -1,7 +1,7 @@
 /**
- * Puertos del core — TODAS las dependencias externas (DB, Stripe, email)
- * entran por acá, inyectadas. El core nunca las importa (architecture-review A8):
- * así `core/` se extrae como paquete con un `git mv`.
+ * Core ports — ALL external dependencies (DB, Stripe, email) come in
+ * through here, injected. The core never imports them (architecture-review A8):
+ * that way `core/` extracts into a package with a single `git mv`.
  */
 import type {
   EventRecord,
@@ -55,7 +55,7 @@ export interface StorePort {
     ticketTypeId: string,
   ): Promise<CatalogSnapshot | null>;
 
-  /** Scope compuesto (rail, buyer_email, key) — fix P4: nunca unique global. */
+  /** Composite scope (rail, buyer_email, key) — fix P4: never a global unique. */
   findOrderByIdempotency(
     rail: Rail,
     buyerEmail: string,
@@ -63,18 +63,18 @@ export interface StorePort {
   ): Promise<Order | null>;
 
   /**
-   * Reserva atómica: UPDATE condicional `issued + reserved + qty <= quota`.
-   * Incluye expiración PEREZOSA (A7): antes de reservar libera reservas de
-   * órdenes pending_payment vencidas de este ticket_type. false = sold_out.
+   * Atomic reservation: conditional UPDATE `issued + reserved + qty <= quota`.
+   * Includes LAZY expiration (A7): before reserving, it releases reservations
+   * of expired pending_payment orders for this ticket_type. false = sold_out.
    */
   reserveInventory(ticketTypeId: string, quantity: number): Promise<boolean>;
 
-  /** Libera cupo reservado NO atado a orden (p.ej. perdió el race de idempotencia). */
+  /** Releases reserved inventory NOT tied to an order (e.g. lost the idempotency race). */
   releaseInventory(ticketTypeId: string, quantity: number): Promise<void>;
 
   /**
-   * Inserta la orden pending_payment. Si la unique (rail,email,key) ya existe
-   * (race de reintentos paralelos) devuelve la existente con created=false.
+   * Inserts the pending_payment order. If the (rail,email,key) unique already
+   * exists (parallel retry race) it returns the existing one with created=false.
    */
   createPendingOrder(
     input: NewOrderInput,
@@ -86,16 +86,16 @@ export interface StorePort {
   ): Promise<void>;
 
   /**
-   * Transición condicional pending_payment → expired|cancelled + libera reserved.
-   * false si la orden no estaba pending (no-op idempotente).
+   * Conditional transition pending_payment → expired|cancelled + releases reserved.
+   * false if the order was not pending (idempotent no-op).
    */
   expireOrder(orderId: string, to: "expired" | "cancelled"): Promise<boolean>;
 
   /**
-   * EL LOCK DE EMISIÓN (fix P3): en UNA transacción —
+   * THE ISSUANCE LOCK (fix P3): in ONE transaction —
    *   UPDATE orders SET status='confirmed' WHERE id=:id AND status='pending_payment'
-   * Solo si afectó 1 fila: mueve reserved→issued, inserta tickets y ticker_event.
-   * Dos webhooks concurrentes: uno gana, el otro recibe already_confirmed.
+   * Only if 1 row was affected: moves reserved→issued, inserts tickets and ticker_event.
+   * Two concurrent webhooks: one wins, the other gets already_confirmed.
    */
   confirmAndIssue(
     orderId: string,
@@ -115,8 +115,8 @@ export interface StorePort {
   }): Promise<void>;
 
   /**
-   * Dedup de webhooks Stripe (fix P3): INSERT ... ON CONFLICT DO NOTHING sobre
-   * processed_stripe_event. true = primera vez (procesar), false = ya visto.
+   * Stripe webhook dedup (fix P3): INSERT ... ON CONFLICT DO NOTHING on
+   * processed_stripe_event. true = first time (process it), false = already seen.
    */
   markStripeEventProcessed(stripeEventId: string): Promise<boolean>;
 }
@@ -132,7 +132,7 @@ export interface HostedCheckoutInput {
 }
 
 export interface PaymentPort {
-  /** v1 (settlement=stripe_hosted): crea el link de Checkout hospedado. */
+  /** v1 (settlement=stripe_hosted): creates the hosted Checkout link. */
   createHostedCheckout(
     input: HostedCheckoutInput,
   ): Promise<{ checkoutUrl: string; sessionId: string }>;
@@ -146,9 +146,9 @@ export interface TicketEmailInput {
   venue: string | null;
   tickets: { code: string }[];
   amount: Money;
-  /** contenido .ics (RFC 5545) para adjuntar */
+  /** .ics content (RFC 5545) to attach */
   icsContent: string;
-  /** link absoluto o relativo al .ics on-demand */
+  /** absolute or relative link to the on-demand .ics */
   icsPath: string;
 }
 

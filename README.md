@@ -1,107 +1,72 @@
-# OpenTicket — agent-native ticketing
+# OpenTicket
 
-*"Your agent handles the checkout."* Plataforma tipo Luma donde cada ticket es comprable por un agente (MCP hoy; ACP/x402 después). Norte: [frontpage.sh](https://www.frontpage.sh/agents). Contexto completo: [PRD.md](PRD.md) · [docs/SYNTHESIS.md](docs/SYNTHESIS.md).
+**Your agent handles the checkout.**
 
-## Setup local
-
-```bash
-pnpm install
-cp .env.example .env        # completar: DATABASE_URL, STRIPE_SECRET_KEY (sk_test_), AUTH_SECRET
-pnpm db:push                # schema → Postgres
-pnpm db:seed                # datos demo
-pnpm dev                    # localhost:3000
-```
-
-Webhook Stripe local (terminal aparte):
-
-```bash
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-# pegar el whsec_... impreso en STRIPE_WEBHOOK_SECRET
-```
-
-Verificar: `pnpm test` (unit) · `pnpm test:integration` (Postgres real) · `pnpm agent:race` (3 agentes, último ticket).
-
-Harness de automejora — **una** pasada que corre todo (lint → tests → build → server real → endpoints agent-native → carrera de agentes) y separa FAIL (código roto) de BLOCKED (falta credencial/config externa):
-
-```bash
-pnpm harness
-```
-
----
-
-## Ejecución: paquete agent-native (nivel frontpage.sh/agents)
-
-Objetivo: que un agente descubra, entienda y compre sin ayuda humana. Orden por impacto/esfuerzo; cada paso termina con su verificación. Subagentes: usar `ot-protocols` para pasos 2-4, `ot-frontend` para paso 1, `ot-devops` para pasos 6-7.
-
-**Estado (2026-07-03):** pasos 1, 2, 3, 4, 6, 7 ✅ hechos y verificados. Paso 5 (repo `openticket-skills`) pendiente — es un repo aparte, fuera de esta app.
-
-### Paso 1 — Página `/agents` (S)
-
-La vitrina para agentes y devs. Ruta `app/agents/page.tsx`, estética CLI como la landing.
-
-Contenido mínimo:
-- URL del MCP server (`https://<dominio>/api/mcp`) + las 4 tools (`search_events`, `get_ticket`, `buy_ticket`, `set_reminder`) con ejemplo de payload.
-- Snippet de conexión para Claude/clientes MCP (JSON de configuración copy-paste).
-- Links a `/llms.txt`, `/openapi.json`, `GET /api/events`.
-- Comando de skills cuando exista el paso 5.
-
-✅ Verificar: la página renderiza y un `curl` a cada URL listada responde.
-
-### Paso 2 — `GET /api/events` (S)
-
-Feed JSON público sin auth: eventos publicados + tipos de ticket + precio + cupo restante. Es el precursor del feed ACP de F2 — mismo query, serialización simple primero.
-
-- Ruta: `app/api/events/route.ts`. Reusar `lib/catalog.ts` (ya tiene el query).
-- Sin datos personales. Cache corto (30-60s) — es para descubrimiento, no para checkout.
-
-✅ Verificar: `curl localhost:3000/api/events | jq` devuelve eventos del seed.
-
-### Paso 3 — `llms.txt` (S)
-
-Archivo estático en `public/llms.txt` (o route handler). Formato [llmstxt.org](https://llmstxt.org): qué es OpenTicket, URL del MCP, endpoints públicos, cómo comprar. Agentes que no hablan MCP descubren por acá.
-
-✅ Verificar: `curl localhost:3000/llms.txt` legible y sin URLs rotas.
-
-### Paso 4 — `/openapi.json` (S)
-
-Spec OpenAPI 3.1 de los endpoints públicos (`/api/events`, `/api/ticker`, subscribe del paso 6). Generar desde los schemas Zod existentes (`core/adapter/rails/schemas.ts`) con `zod-to-openapi` — no escribir el spec a mano, se desincroniza.
-
-- Ruta: `app/openapi.json/route.ts`.
-
-✅ Verificar: pegar el output en editor.swagger.io → 0 errores.
-
-### Paso 5 — Repo de skills instalables (M)
-
-Distribución tipo `npx skills add DFectuoso/frontpage-sh-skills`. Repo nuevo `openticket-skills` con:
+OpenTicket is an agent-native ticketing platform: every ticket is discoverable and purchasable by an AI agent — not just by a human clicking "buy". An agent finds the event, pays within the user's spending limit via Stripe, gets the ticket issued, and the buyer receives an email with a calendar invite (`.ics`) with reminders. No scraping, no browser automation, no human in the loop.
 
 ```
-skills/
-  openticket-search-events/SKILL.md   # cómo consultar el feed/MCP
-  openticket-buy-ticket/SKILL.md      # flujo de compra: mandate, idempotency key, manejo de sold_out
+$ your-agent: "get me a ticket for the jazz night on Friday, up to $50"
+  ✓ search_events("jazz")        → evt_a1b2 · Jazz Night · $35
+  ✓ buy_ticket(spend_limit: $50) → pending_payment · checkout_url
+  ✓ payment confirmed            → ticket tkt_9f8e · .ics sent to your inbox
 ```
 
-Cada SKILL.md le enseña a cualquier agente a usar el MCP sin configuración: URL, tools, errores estructurados (`sold_out`, `mandate_exceeded`), y que el idempotency key lo genera el agente y lo repite en reintentos.
+## Buy tickets with your agent (MCP)
 
-✅ Verificar: `npx skills add <org>/openticket-skills --copy` en un proyecto limpio → Claude compra un ticket de test guiado solo por la skill.
+Point any MCP client (Claude, or your own agent) at the server:
 
-### Paso 6 — Digest subscribe (S)
+```json
+{
+  "mcpServers": {
+    "openticket": { "url": "https://<host>/api/mcp" }
+  }
+}
+```
 
-`POST /api/newsletter/subscribe` público (email + opt-in). Solo guarda el suscriptor (tabla nueva vía `ot-db`); el envío del digest es F3, no bloquea.
+| Tool | What it does |
+|---|---|
+| `search_events` | Find published events with ticket types, prices, and remaining availability |
+| `get_ticket` | Inspect a ticket type before buying |
+| `buy_ticket` | Purchase within a `spend_limit`; returns `pending_payment` + a Stripe `checkout_url` |
+| `get_order` | Poll order status; returns tickets and the `.ics` link once confirmed |
+| `set_reminder` | Schedule an email reminder with a `.ics` (24h and 1h alarms) |
 
-- Validación Zod + rate-limit básico (es endpoint público).
+Rules of the road for agents:
 
-✅ Verificar: POST con email válido → 200 y fila en DB; email basura → 400.
+- **Idempotency:** you generate the `idempotency_key` and reuse it on every retry — retries return the same order, never a double charge.
+- **Spending limits:** `buy_ticket` requires a `spend_limit` (amount + currency). Purchases above it are rejected with `mandate_exceeded` *before* any charge.
+- **Structured errors:** `sold_out`, `mandate_exceeded`, `invalid_intent`, `event_unavailable`, `payment_failed` — machine-readable, safe to branch on.
+- Discovery tools are open; `buy_ticket` requires an API key (`Authorization: Bearer`).
 
-### Paso 7 — API keys + rate-limit (M) — antes de abrir el feed público
+## Discovery without MCP
 
-PRD FR-11. API key simple v1 (hash en DB, header `Authorization: Bearer`), rate-limit por key en los endpoints de compra. Los GET de descubrimiento quedan sin auth.
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/events` | Public JSON feed: published events, ticket types, prices (minor units), live availability |
+| `GET /llms.txt` | Plain-text instructions for agents that don't speak MCP ([llmstxt.org](https://llmstxt.org)) |
+| `GET /openapi.json` | OpenAPI 3.1 spec of the public endpoints |
+| `GET /api/ticker` | Live activity stream (SSE), PII-free |
 
-✅ Verificar: compra MCP sin key → 401; con key → ok; ráfaga sobre el límite → 429.
+## For organizers
 
-### Requisito transversal
+Create an event with ticket types, prices, and quotas; publish it; done — your tickets are instantly purchasable by every agent that speaks MCP, with zero integration work on your side. Flat 5% platform fee, same for human and agent sales. Inventory is enforced atomically in the database: no overselling, even with dozens of agents racing for the last ticket.
 
-Todo input de agente pasa por schemas Zod (trust boundary, PRD §7). Ningún paso introduce un endpoint que acepte input sin validar.
+## How it works
 
-## Después de esto
+```
+agent ──MCP──▶ ┌─────────────────────────────────────────────┐
+web   ──UI───▶ │ PurchaseCore (framework-free, core/)         │
+               │ idempotency → spend limit → atomic reserve   │──▶ Stripe hosted checkout
+               │ → order → [webhook] → issue → email + .ics   │
+               └─────────────────────────────────────────────┘
+```
 
-Deploy a Vercel + webhook Stripe de producción + commit inicial del repo (ver agente `ot-devops`), y luego F2 del [PRD](PRD.md): feed ACP formal + conformance + x402 stretch.
+One purchase pipeline, thin adapters per rail. Live today: **MCP** and **web**. On the roadmap behind the same adapter: **ACP** (OpenAI/Stripe Agentic Commerce Protocol), **x402** (HTTP 402 / stablecoin), **AP2** (mandates as verifiable credentials).
+
+## Development & self-hosting
+
+Contributor setup, test harness, and architecture notes: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Product spec lives in [PRD.md](PRD.md) and [docs/](docs/).
+
+## License
+
+[MIT](LICENSE)

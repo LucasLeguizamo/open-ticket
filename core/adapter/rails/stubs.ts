@@ -1,11 +1,11 @@
 /**
- * Stubs de rails de fases posteriores, detrás de feature flag (PRD §12).
- * Existen para que los TIPOS y el registro queden cerrados desde F0:
- *  - acp:  sesión stateful + settlement inline SPT (F2, conformance vs mock)
- *  - ap2:  OVERLAY de autorización sobre un settlement — no un rail paralelo
- *          (protocol-audit mismatch 3); se modela como authorization="ap2_mandate"
- *  - x402: settlement onchain USDC (stretch goal, Base Sepolia)
- *  - mpp:  Machine Payments Protocol (Stripe/Tempo) — redundante con x402, stub
+ * Stubs for later-phase rails, behind a feature flag (PRD §12).
+ * They exist so the TYPES and the registry are closed from F0:
+ *  - acp:  stateful session + inline SPT settlement (F2, conformance vs mock)
+ *  - ap2:  authorization OVERLAY on top of a settlement — not a parallel rail
+ *          (protocol-audit mismatch 3); modeled as authorization="ap2_mandate"
+ *  - x402: onchain USDC settlement (stretch goal, Base Sepolia)
+ *  - mpp:  Machine Payments Protocol (Stripe/Tempo) — redundant with x402, stub
  */
 import { AgentCommerceError } from "../errors";
 import type { RailAdapter } from "../types";
@@ -13,7 +13,7 @@ import type { RailAdapter } from "../types";
 function notImplemented(rail: string): never {
   throw new AgentCommerceError(
     "not_implemented",
-    `rail "${rail}" no implementado en esta fase (feature flag off)`,
+    `rail "${rail}" not implemented in this phase (feature flag off)`,
   );
 }
 

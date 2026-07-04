@@ -1,9 +1,9 @@
 /**
- * Feed JSON público de descubrimiento (README paso 2) — precursor del feed ACP
- * de F2. Eventos publicados + tipos de ticket con precio y cupo restante. Sin
- * PII, sin auth: es para que un agente descubra qué hay comprable.
+ * Public JSON discovery feed (README step 2) — precursor of the F2 ACP feed.
+ * Published events + ticket types with price and remaining quota. No PII,
+ * no auth: it exists so an agent can discover what is buyable.
  *
- * Reusa lib/catalog.searchEvents (mismo query que el MCP `search_events`).
+ * Reuses lib/catalog.searchEvents (same query as the MCP `search_events`).
  */
 import { searchEvents } from "@/lib/catalog";
 
@@ -15,7 +15,7 @@ export async function GET(req: Request): Promise<Response> {
     { events, count: events.length },
     {
       headers: {
-        // descubrimiento, no checkout: cupo puede quedar 30-60s viejo (README)
+        // discovery, not checkout: quota may be 30-60s stale (README)
         "cache-control": "public, max-age=30, s-maxage=60",
       },
     },

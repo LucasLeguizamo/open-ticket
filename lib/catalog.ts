@@ -1,8 +1,8 @@
 /**
- * Queries read-only de catálogo para descubrimiento agéntico
+ * Read-only catalog queries for agentic discovery
  * (MCP `search_events` / `get_ticket` / `set_reminder`).
- * Vive en lib/ (app layer): es lectura de datos, no pipeline de compra — el
- * core solo conoce StorePort y este módulo no participa en cobros.
+ * Lives in lib/ (app layer): it reads data, it is not the purchase pipeline —
+ * the core only knows StorePort and this module takes no part in payments.
  */
 import { and, asc, eq, gte, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/db/client";
@@ -13,7 +13,7 @@ export interface TicketTypeSummary {
   name: string;
   price_minor: number;
   currency: string;
-  /** cupo comprable ahora mismo (quota - issued - reserved) */
+  /** purchasable inventory right now (quota - issued - reserved) */
   available: number;
   status: string;
 }
@@ -45,7 +45,7 @@ function toTicketTypeSummary(
   };
 }
 
-/** Eventos publicados y futuros, con sus ticket types visibles. */
+/** Published upcoming events, with their visible ticket types. */
 export async function searchEvents(
   query?: string,
   limit = 20,
@@ -112,7 +112,7 @@ export interface TicketTypeDetail extends TicketTypeSummary {
   };
 }
 
-/** Detalle de un tipo de ticket (precio, cupo, moneda) antes de comprar. */
+/** Detail for a ticket type (price, availability, currency) before buying. */
 export async function getTicketTypeDetail(
   ticketTypeId: string,
 ): Promise<TicketTypeDetail | null> {
@@ -138,7 +138,7 @@ export async function getTicketTypeDetail(
   };
 }
 
-/** Evento publicado por slug + sus ticket types (página pública /e/[slug]). */
+/** Published event by slug + its ticket types (public page /e/[slug]). */
 export async function getPublishedEventBySlug(slug: string) {
   const db = getDb();
   const rows = await db
@@ -158,7 +158,7 @@ export async function getPublishedEventBySlug(slug: string) {
   };
 }
 
-/** Evento publicado por id (para set_reminder con event_id). */
+/** Published event by id (for set_reminder with event_id). */
 export async function getPublishedEvent(eventId: string) {
   const db = getDb();
   const rows = await db

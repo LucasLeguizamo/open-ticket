@@ -1,5 +1,5 @@
-# CI mínimo (test-strategy §5.4): lint → unit → integración (Postgres real) → build.
-# El user/db del service matchea .env.test (test/setup.ts la carga con override).
+# Minimal CI (test-strategy §5.4): lint → unit → integration (real Postgres) → build.
+# The service user/db matches .env.test (test/setup.ts loads it with override).
 name: CI
 
 on:

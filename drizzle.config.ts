@@ -1,7 +1,7 @@
 import { defineConfig } from "drizzle-kit";
 
-// Drizzle Kit es el DUEÑO ÚNICO del schema (architecture-review C4/A6).
-// Supabase solo hostea Postgres: no usar su editor de tablas ni migraciones propias.
+// Drizzle Kit is the SOLE OWNER of the schema (architecture-review C4/A6).
+// Supabase only hosts Postgres: do not use its table editor or its own migrations.
 export default defineConfig({
   schema: "./db/schema.ts",
   out: "./db/migrations",

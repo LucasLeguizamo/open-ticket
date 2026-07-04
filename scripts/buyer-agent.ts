@@ -1,16 +1,16 @@
 /**
- * TestBuyerAgent (F1.5) — harness agente-comprador contra el MCP server real.
- * Escena del pitch: N agentes pelean el último ticket, exactamente 1 gana.
+ * TestBuyerAgent (F1.5) — buyer-agent harness against the real MCP server.
+ * The pitch scene: N agents fight for the last ticket, exactly 1 wins.
  *
- * Uso:
- *   pnpm agent:race                          # 3 agentes vs el ticket con menos cupo
+ * Usage:
+ *   pnpm agent:race                          # 3 agents vs the ticket with the lowest availability
  *   MCP_URL=https://…/api/mcp AGENTS=5 pnpm agent:race
  */
 import "dotenv/config";
 
 const MCP_URL = process.env.MCP_URL ?? "http://localhost:3111/api/mcp";
 const AGENTS = Number(process.env.AGENTS ?? 3);
-// buy_ticket exige API key (README paso 7). El seed crea esta demo key.
+// buy_ticket requires an API key (README step 7). The seed creates this demo key.
 const API_KEY =
   process.env.OPENTICKET_API_KEY ?? "ot_live_demo_key_solo_para_test";
 
@@ -31,12 +31,13 @@ async function callTool(name: string, args: unknown): Promise<any> {
     }),
   });
   const body = await res.text();
-  // streamable HTTP responde SSE: la última línea `data:` trae el resultado
+  // streamable HTTP responds with SSE: the last `data:` line carries the result
   const data = body
     .split("\n")
     .filter((l) => l.startsWith("data:"))
     .pop();
-  if (!data) throw new Error(`respuesta MCP sin data: ${body.slice(0, 200)}`);
+  if (!data)
+    throw new Error(`MCP response without data: ${body.slice(0, 200)}`);
   const parsed = JSON.parse(data.slice(5));
   if (parsed.error) throw new Error(`MCP error: ${parsed.error.message}`);
   return JSON.parse(parsed.result.content[0].text);
@@ -47,9 +48,9 @@ function log(agent: string, msg: string) {
 }
 
 async function main() {
-  console.log(`── TestBuyerAgent · ${AGENTS} agentes · ${MCP_URL} ──\n`);
+  console.log(`── TestBuyerAgent · ${AGENTS} agents · ${MCP_URL} ──\n`);
 
-  // 1. descubrir el ticket con menos cupo disponible (>0)
+  // 1. discover the ticket with the lowest availability (>0)
   const { events } = await callTool("search_events", {});
   const candidates = events
     .flatMap((e: any) => e.ticket_types.map((t: any) => ({ event: e, tt: t })))
@@ -57,14 +58,14 @@ async function main() {
     .sort((a: any, b: any) => a.tt.available - b.tt.available);
   const target = candidates[0];
   if (!target) {
-    console.error("no hay tickets disponibles — corre pnpm db:seed");
+    console.error("no tickets available — run pnpm db:seed");
     process.exit(1);
   }
   console.log(
-    `objetivo: "${target.tt.name}" de "${target.event.title}" — ${target.tt.available} disponible(s)\n`,
+    `target: "${target.tt.name}" from "${target.event.title}" — ${target.tt.available} available\n`,
   );
 
-  // 2. N agentes compran EN PARALELO con keys distintas (carrera real)
+  // 2. N agents buy IN PARALLEL with distinct keys (a real race)
   const race = await Promise.all(
     Array.from({ length: AGENTS }, async (_, i) => {
       const name = `aria-${i + 1}`;
@@ -84,10 +85,10 @@ async function main() {
           log(name, `✗ ${r.error.code}`);
           return { name, ok: false, code: r.error.code };
         }
-        log(name, `✓ ${r.status} → orden ${r.order_id}`);
+        log(name, `✓ ${r.status} → order ${r.order_id}`);
         log(
           name,
-          `  checkout: ${r.checkout_url ?? "(pago falló: revisa STRIPE_SECRET_KEY)"}`,
+          `  checkout: ${r.checkout_url ?? "(payment failed: check STRIPE_SECRET_KEY)"}`,
         );
         return { name, ok: true, orderId: r.order_id };
       } catch (err) {
@@ -97,17 +98,19 @@ async function main() {
     }),
   );
 
-  // 3. veredicto
+  // 3. verdict
   const winners = race.filter((r) => r.ok);
   const losers = race.filter((r) => !r.ok);
   console.log(
-    `\nresultado: ${winners.length} reserva(s), ${losers.length} rebotado(s) [${losers.map((l) => l.code).join(", ")}]`,
+    `\nresult: ${winners.length} reserved, ${losers.length} bounced [${losers.map((l) => l.code).join(", ")}]`,
   );
   if (target.tt.available === 1 && winners.length !== 1) {
-    console.error("FAIL: había 1 cupo y no ganó exactamente 1 agente");
+    console.error(
+      "FAIL: 1 spot was available but the winner count was not exactly 1",
+    );
     process.exit(1);
   }
-  console.log("OK: inventario respetado bajo carrera de agentes ✓");
+  console.log("OK: inventory held up under the agent race ✓");
 }
 
 main().catch((err) => {

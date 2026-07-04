@@ -1,13 +1,13 @@
 /**
- * Tags de Cache Components (Next 16). Convención única para todo el repo:
- *  - `events`            → listados/feed (landing, feed ACP en F1)
- *  - `event:{slug}`      → página pública de un evento (incluye disponibilidad)
+ * Cache Components tags (Next 16). Single convention for the whole repo:
+ *  - `events`            → listings/feed (landing, ACP feed in F1)
+ *  - `event:{slug}`      → an event's public page (includes availability)
  *
- * Invalidación:
- *  - Route handlers (webhook Stripe) → revalidateTag(...) al confirmar compra
- *    (cambia inventario → la página del evento debe refrescar disponibilidad).
- *  - Server actions (publicar evento, editar — F1) → updateTag(...) para que
- *    la MISMA request ya vea el dato fresco. Patrón listo en app/actions/.
+ * Invalidation:
+ *  - Route handlers (Stripe webhook) → revalidateTag(...) when a purchase is
+ *    confirmed (inventory changes → the event page must refresh availability).
+ *  - Server actions (publish event, edit — F1) → updateTag(...) so the SAME
+ *    request already sees fresh data. Pattern ready in app/actions/.
  */
 export const EVENTS_TAG = "events";
 

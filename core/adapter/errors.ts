@@ -1,4 +1,4 @@
-/** Modelo de error común a todos los rails (agent-commerce-adapter §5). */
+/** Error model shared by all rails (agent-commerce-adapter §5). */
 
 export type AgentCommerceErrorCode =
   | "sold_out"
@@ -16,7 +16,7 @@ const HTTP_STATUS: Record<AgentCommerceErrorCode, number> = {
   payment_failed: 402,
   event_unavailable: 410,
   invalid_intent: 400,
-  duplicate: 200, // devuelve la orden previa, no es un fallo
+  duplicate: 200, // returns the previous order; not a failure
   not_implemented: 501,
   internal: 500,
 };

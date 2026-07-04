@@ -1,8 +1,8 @@
 /**
- * StorePort en memoria para tests UNITARIOS del PurchaseCore (lógica de
- * pipeline, errores, spend_limit). Regla de mocks (test-strategy §2):
- * inventario/idempotencia BAJO CONCURRENCIA se prueban contra Postgres real
- * en test/integration — este fake es secuencial a propósito.
+ * In-memory StorePort for PurchaseCore UNIT tests (pipeline logic,
+ * errors, spend_limit). Mocking rule (test-strategy §2):
+ * inventory/idempotency UNDER CONCURRENCY are tested against real Postgres
+ * in test/integration — this fake is sequential on purpose.
  */
 
 import type {

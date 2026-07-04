@@ -7,7 +7,7 @@ export default defineConfig({
   },
   test: {
     setupFiles: ["./test/setup.ts"],
-    // integración golpea Postgres real (docker-compose.test.yml) — serial
+    // integration hits real Postgres (docker-compose.test.yml) — serial
     fileParallelism: false,
   },
 });

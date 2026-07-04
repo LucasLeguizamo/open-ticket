@@ -1,7 +1,7 @@
 /**
- * Sesión de organizador: cookie httpOnly firmada con HMAC (AUTH_SECRET).
- * Formato: `<organizerId>.<expiresMs>.<hmac>`. Sin tabla de sesiones —
- * stateless, expira sola y revocar = cambiar AUTH_SECRET.
+ * Organizer session: httpOnly cookie signed with HMAC (AUTH_SECRET).
+ * Format: `<organizerId>.<expiresMs>.<hmac>`. No sessions table —
+ * stateless, expires on its own; revoking = rotating AUTH_SECRET.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
@@ -12,7 +12,7 @@ const MAX_AGE_S = 30 * 24 * 60 * 60;
 function secret(): string {
   const s = process.env.AUTH_SECRET;
   if (!s || s.length < 16) {
-    throw new Error("AUTH_SECRET no está configurada (mínimo 16 chars)");
+    throw new Error("AUTH_SECRET is not set (minimum 16 chars)");
   }
   return s;
 }

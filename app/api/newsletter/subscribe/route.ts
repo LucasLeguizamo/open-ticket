@@ -1,8 +1,8 @@
 /**
- * Digest subscribe (README paso 6) — endpoint público que solo guarda el
- * suscriptor. El envío del digest es F3; esto no lo bloquea.
+ * Digest subscribe (README step 6) — public endpoint that only stores the
+ * subscriber. Sending the digest is F3; this does not block it.
  *
- * Trust boundary (PRD §7): email validado con Zod antes de tocar la DB.
+ * Trust boundary (PRD §7): email validated with Zod before touching the DB.
  */
 import { z } from "zod";
 import { randomId } from "@/core";
@@ -11,9 +11,9 @@ import { digestSubscriber } from "@/db/schema";
 
 const bodySchema = z.object({ email: z.string().email().max(254) });
 
-// ponytail: rate-limit en memoria por IP (10/min). Es best-effort: en Vercel
-// serverless no se comparte entre instancias. Subir a KV/Upstash si el spam real
-// lo justifica; alcanza para v1.
+// ponytail: in-memory rate limit per IP (10/min). Best-effort: on Vercel
+// serverless it is not shared across instances. Move to KV/Upstash if real
+// spam justifies it; good enough for v1.
 const HITS = new Map<string, { count: number; resetAt: number }>();
 const LIMIT = 10;
 const WINDOW_MS = 60_000;
@@ -46,7 +46,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "invalid_email" }, { status: 400 });
   }
 
-  // idempotente: re-suscribir el mismo email no es error ni duplica fila.
+  // idempotent: re-subscribing the same email is not an error and does not duplicate the row.
   await getDb()
     .insert(digestSubscriber)
     .values({ id: randomId("sub"), email: parsed.data.email.toLowerCase() })

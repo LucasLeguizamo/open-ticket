@@ -1,27 +1,27 @@
 /**
- * Generación de .ics (RFC 5545) a mano, sin dependencias (tech-stack Q2).
- * VCALENDAR / VEVENT / VALARM con alarmas por defecto 24h y 1h antes.
- * Fechas en UTC (sufijo Z) — evita VTIMEZONE y es válido en todo calendario.
- * Se genera ON-DEMAND desde la orden (architecture-review D3): no se persiste.
+ * Hand-rolled .ics generation (RFC 5545), no dependencies (tech-stack Q2).
+ * VCALENDAR / VEVENT / VALARM with default alarms 24h and 1h before.
+ * Dates in UTC (Z suffix) — avoids VTIMEZONE and is valid in every calendar.
+ * Generated ON-DEMAND from the order (architecture-review D3): never persisted.
  */
 
 export interface IcsInput {
-  /** UID determinístico (p.ej. `${orderId}@openticket`) para no duplicar en el calendario. */
+  /** Deterministic UID (e.g. `${orderId}@openticket`) to avoid calendar duplicates. */
   uid: string;
   title: string;
   description?: string;
   location?: string;
   startsAt: Date;
   endsAt?: Date | null;
-  /** Minutos antes del evento para cada VALARM. Default [1440, 60]. */
+  /** Minutes before the event for each VALARM. Default [1440, 60]. */
   alarmOffsetsMinutes?: number[];
-  /** Inyectable para tests (DTSTAMP determinístico). */
+  /** Injectable for tests (deterministic DTSTAMP). */
   now?: Date;
 }
 
 export const DEFAULT_ALARM_OFFSETS_MINUTES = [1440, 60];
 
-/** Escapa texto según RFC 5545 §3.3.11: \ ; , y saltos de línea. */
+/** Escapes text per RFC 5545 §3.3.11: \ ; , and line breaks. */
 function escapeText(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
@@ -30,7 +30,7 @@ function escapeText(value: string): string {
     .replace(/\r?\n/g, "\\n");
 }
 
-/** YYYYMMDDTHHMMSSZ en UTC. */
+/** YYYYMMDDTHHMMSSZ in UTC. */
 function formatUtc(d: Date): string {
   return d
     .toISOString()
@@ -38,14 +38,14 @@ function formatUtc(d: Date): string {
     .replace(/\.\d{3}/, "");
 }
 
-/** TRIGGER negativo: 1440 → -PT24H, 60 → -PT1H, 30 → -PT30M. */
+/** Negative TRIGGER: 1440 → -PT24H, 60 → -PT1H, 30 → -PT30M. */
 function alarmTrigger(minutes: number): string {
   if (minutes > 0 && minutes % 60 === 0) return `-PT${minutes / 60}H`;
   return `-PT${minutes}M`;
 }
 
-/** Line folding RFC 5545 §3.1: líneas de máx 75 OCTETOS, continuación con espacio.
- *  Byte-aware para no partir caracteres UTF-8 multibyte. */
+/** Line folding RFC 5545 §3.1: lines of max 75 OCTETS, continuation with a space.
+ *  Byte-aware so multibyte UTF-8 characters are never split. */
 function fold(line: string): string[] {
   const bytes = Buffer.from(line, "utf8");
   if (bytes.length <= 75) return [line];
@@ -53,7 +53,7 @@ function fold(line: string): string[] {
   let start = 0;
   let first = true;
   while (start < bytes.length) {
-    const limit = first ? 75 : 74; // la continuación lleva 1 octeto de espacio
+    const limit = first ? 75 : 74; // the continuation carries 1 octet for the space
     let end = Math.min(start + limit, bytes.length);
     while (end < bytes.length && ((bytes[end] as number) & 0xc0) === 0x80)
       end--;

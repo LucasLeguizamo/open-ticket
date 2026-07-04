@@ -1,6 +1,6 @@
 /**
- * Tests unitarios del pipeline PurchaseCore (test-strategy §2.1) con FakeStore.
- * Cada error verifica (a) código correcto y (b) estado de inventario/orden.
+ * Unit tests for the PurchaseCore pipeline (test-strategy §2.1) with FakeStore.
+ * Each error verifies (a) the correct code and (b) inventory/order state.
  */
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -51,7 +51,7 @@ function buyInput(overrides: Record<string, unknown> = {}) {
 async function expectError(promise: Promise<unknown>, code: string) {
   try {
     await promise;
-    expect.unreachable(`esperaba AgentCommerceError ${code}`);
+    expect.unreachable(`expected AgentCommerceError ${code}`);
   } catch (err) {
     if (!isAgentCommerceError(err)) throw err;
     expect(err.code).toBe(code);
@@ -59,8 +59,8 @@ async function expectError(promise: Promise<unknown>, code: string) {
   }
 }
 
-describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
-  it("happy path: orden pending_payment, cupo reservado, checkout_url, 0 tickets", async () => {
+describe("PurchaseCore.run (MCP rail, hosted payment)", () => {
+  it("happy path: pending_payment order, inventory reserved, checkout_url, 0 tickets", async () => {
     const store = new FakeStore();
     const res = await makeCore(store).run(buyInput(), mcpRail);
     expect(res.status).toBe("pending_payment");
@@ -72,29 +72,29 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     expect(store.ticketType.issued).toBe(0);
     const order = store.orders.get(res.order_id)!;
     expect(order.amountMinor).toBe(10_000);
-    expect(order.platformFeeMinor).toBe(500); // 5% plano (SYNTHESIS §2)
+    expect(order.platformFeeMinor).toBe(500); // flat 5% (SYNTHESIS §2)
     expect(order.boughtByAgent).toBe(true);
   });
 
-  it("reintento con la misma idempotency_key devuelve la MISMA orden sin reservar de nuevo", async () => {
+  it("retry with the same idempotency_key returns the SAME order without reserving again", async () => {
     const store = new FakeStore();
     const core = makeCore(store);
     const first = await core.run(buyInput(), mcpRail);
     const retry = await core.run(buyInput(), mcpRail);
     expect(retry.order_id).toBe(first.order_id);
     expect(retry.duplicate).toBe(true);
-    expect(store.ticketType.reserved).toBe(2); // no 4
+    expect(store.ticketType.reserved).toBe(2); // not 4
     expect(store.orders.size).toBe(1);
   });
 
-  it("sold_out: cupo agotado → error, sin orden, reserved intacto", async () => {
+  it("sold_out: inventory exhausted → error, no order, reserved untouched", async () => {
     const store = new FakeStore({ ticketType: makeTicketType({ quota: 1 }) });
     await expectError(makeCore(store).run(buyInput(), mcpRail), "sold_out");
     expect(store.orders.size).toBe(0);
     expect(store.ticketType.reserved).toBe(0);
   });
 
-  it("mandate_exceeded: total > spend_limit, ANTES de reservar", async () => {
+  it("mandate_exceeded: total > spend_limit, BEFORE reserving", async () => {
     const store = new FakeStore();
     await expectError(
       makeCore(store).run(
@@ -107,7 +107,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     expect(store.orders.size).toBe(0);
   });
 
-  it("spend_limit es OBLIGATORIO en rail MCP (Q2)", async () => {
+  it("spend_limit is REQUIRED on the MCP rail (Q2)", async () => {
     const store = new FakeStore();
     await expectError(
       makeCore(store).run(buyInput({ spend_limit: undefined }), mcpRail),
@@ -115,7 +115,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     );
   });
 
-  it("spend_limit en otra moneda que el evento → invalid_intent (nunca comparar FX)", async () => {
+  it("spend_limit in a different currency than the event → invalid_intent (never compare FX)", async () => {
     const store = new FakeStore();
     await expectError(
       makeCore(store).run(
@@ -126,7 +126,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     );
   });
 
-  it("input adversarial: quantity 0, email inválido, props extra → invalid_intent", async () => {
+  it("adversarial input: quantity 0, invalid email, extra props → invalid_intent", async () => {
     const store = new FakeStore();
     const core = makeCore(store);
     await expectError(
@@ -144,7 +144,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     expect(store.orders.size).toBe(0);
   });
 
-  it("ticket_type inexistente → invalid_intent", async () => {
+  it("nonexistent ticket_type → invalid_intent", async () => {
     const store = new FakeStore();
     await expectError(
       makeCore(store).run(buyInput({ ticket_type_id: "tt_nope" }), mcpRail),
@@ -152,7 +152,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     );
   });
 
-  it("evento draft → event_unavailable, sin reserva", async () => {
+  it("draft event → event_unavailable, no reservation", async () => {
     const store = new FakeStore({ event: makeEvent({ status: "draft" }) });
     await expectError(
       makeCore(store).run(buyInput(), mcpRail),
@@ -161,7 +161,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     expect(store.ticketType.reserved).toBe(0);
   });
 
-  it("checkout de Stripe falla → payment_failed, orden cancelled, cupo liberado", async () => {
+  it("Stripe checkout fails → payment_failed, order cancelled, inventory released", async () => {
     const store = new FakeStore();
     const core = makeCore(store, {
       payments: {
@@ -176,7 +176,7 @@ describe("PurchaseCore.run (rail MCP, pago hospedado)", () => {
     expect(order!.status).toBe("cancelled");
   });
 
-  it("rail web: sin spend_limit (authorization=none) pasa; boughtByAgent=false", async () => {
+  it("web rail: without spend_limit (authorization=none) passes; boughtByAgent=false", async () => {
     const store = new FakeStore();
     const res = await makeCore(store).run(
       buyInput({ spend_limit: undefined }),
@@ -193,7 +193,7 @@ describe("PurchaseCore.handlePaymentSucceeded (webhook)", () => {
     return res.order_id;
   }
 
-  it("confirma: reserved→issued, N tickets valid, reminder + email disparados", async () => {
+  it("confirms: reserved→issued, N valid tickets, reminder + email fired", async () => {
     const store = new FakeStore();
     const mailer: MailerPort = { sendTicketEmail: vi.fn(async () => {}) };
     const core = makeCore(store, { mailer });
@@ -210,18 +210,18 @@ describe("PurchaseCore.handlePaymentSucceeded (webhook)", () => {
     expect(detail!.order.status).toBe("confirmed");
   });
 
-  it("webhook duplicado → already_processed, SIN doble emisión (R1)", async () => {
+  it("duplicate webhook → already_processed, NO double issuance (R1)", async () => {
     const store = new FakeStore();
     const core = makeCore(store);
     const orderId = await pendingOrder(core);
     await core.handlePaymentSucceeded(orderId, "pi_123");
     const second = await core.handlePaymentSucceeded(orderId, "pi_123");
     expect(second).toBe("already_processed");
-    expect(store.ticketType.issued).toBe(2); // no 4
+    expect(store.ticketType.issued).toBe(2); // not 4
     expect(store.ticketsByOrder.get(orderId)).toHaveLength(2);
   });
 
-  it("email falla POST-capture → cargo NO se revierte: orden confirmed, tickets emitidos (R4)", async () => {
+  it("email fails POST-capture → charge is NOT rolled back: order confirmed, tickets issued (R4)", async () => {
     const store = new FakeStore();
     const core = makeCore(store, {
       mailer: {
@@ -237,14 +237,14 @@ describe("PurchaseCore.handlePaymentSucceeded (webhook)", () => {
     expect(store.ticketType.issued).toBe(2);
   });
 
-  it("webhook sobre orden inexistente → ignored, nada explota", async () => {
+  it("webhook for a nonexistent order → ignored, nothing blows up", async () => {
     const store = new FakeStore();
     expect(
       await makeCore(store).handlePaymentSucceeded("ord_ghost", null),
     ).toBe("ignored");
   });
 
-  it("pago sobre orden ya expirada → ignored, NO emite (webhook fuera de orden, R7)", async () => {
+  it("payment for an already-expired order → ignored, does NOT issue (out-of-order webhook, R7)", async () => {
     const store = new FakeStore();
     const core = makeCore(store);
     const orderId = await pendingOrder(core);
@@ -257,7 +257,7 @@ describe("PurchaseCore.handlePaymentSucceeded (webhook)", () => {
 });
 
 describe("PurchaseCore.handleCheckoutExpired", () => {
-  it("libera la reserva y es idempotente", async () => {
+  it("releases the reservation and is idempotent", async () => {
     const store = new FakeStore();
     const core = makeCore(store);
     const res = await core.run(buyInput(), mcpRail);

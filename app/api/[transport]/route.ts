@@ -1,15 +1,15 @@
 /**
- * MCP server de OpenTicket (F1, US-003) — streamable HTTP en /api/mcp.
+ * OpenTicket MCP server (F1, US-003) — streamable HTTP at /api/mcp.
  *
  * Tools (adapter doc §6-§8): search_events, get_ticket, buy_ticket,
- * get_order, set_reminder. Adaptador delgado: buy_ticket monta el `mcpRail`
- * puro del core sobre PurchaseCore; el resto son lecturas de catálogo/orden.
+ * get_order, set_reminder. Thin adapter: buy_ticket mounts the core's pure
+ * `mcpRail` on PurchaseCore; the rest are catalog/order reads.
  *
- * Trust boundary (PRD §7): todo input pasa por Zod antes de tocar nada.
+ * Trust boundary (PRD §7): every input goes through Zod before touching anything.
  *
- * Auth (README paso 7): discovery (search_events/get_ticket/set_reminder) queda
- * abierto; `buy_ticket` exige API key. withMcpAuth con required:false verifica el
- * bearer si viene y adjunta authInfo, sin bloquear las tools de descubrimiento.
+ * Auth (README step 7): discovery (search_events/get_ticket/set_reminder) stays
+ * open; `buy_ticket` requires an API key. withMcpAuth with required:false checks
+ * the bearer if present and attaches authInfo, without blocking discovery tools.
  */
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
@@ -38,7 +38,7 @@ function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
 }
 
-/** Errores tipados del core → resultado que el agente puede leer y reaccionar. */
+/** Typed core errors → a result the agent can read and react to. */
 function toolError(
   code: string,
   message: string,
@@ -62,10 +62,10 @@ async function run(fn: () => Promise<ToolResult>): Promise<ToolResult> {
     if (err instanceof AgentCommerceError) {
       return toolError(err.code, err.message, err.details);
     }
-    console.error("[mcp] error inesperado", err);
+    console.error("[mcp] unexpected error", err);
     return toolError(
       "internal",
-      "error inesperado; reintenta con la misma idempotency_key",
+      "unexpected error; retry with the same idempotency_key",
     );
   }
 }
@@ -74,13 +74,13 @@ const handler = createMcpHandler(
   (server) => {
     server.tool(
       "search_events",
-      "Busca eventos publicados (título/descripción/venue) y devuelve sus tipos de ticket con precio y cupo disponible.",
+      "Searches published events (title/description/venue) and returns their ticket types with price and available quota.",
       {
         query: z
           .string()
           .max(200)
           .optional()
-          .describe("Texto libre; vacío = próximos eventos."),
+          .describe("Free text; empty = upcoming events."),
         limit: z.number().int().min(1).max(50).default(20),
       },
       async ({ query, limit }) =>
@@ -89,7 +89,7 @@ const handler = createMcpHandler(
 
     server.tool(
       "get_ticket",
-      "Detalle de un tipo de ticket (precio en unidades mínimas, moneda ISO 4217, cupo disponible) antes de comprar.",
+      "Details of a ticket type (price in minor units, ISO 4217 currency, available quota) before buying.",
       { ticket_type_id: z.string().min(1).max(64) },
       async ({ ticket_type_id }) =>
         run(async () => {
@@ -97,7 +97,7 @@ const handler = createMcpHandler(
           if (!detail)
             return toolError(
               "invalid_intent",
-              "ticket_type_id inexistente o evento no disponible",
+              "ticket_type_id does not exist or event is unavailable",
             );
           return ok(detail);
         }),
@@ -105,7 +105,7 @@ const handler = createMcpHandler(
 
     server.tool(
       "buy_ticket",
-      "Compra tickets para un evento respetando el spend_limit del usuario. Requiere API key (header Authorization: Bearer). Devuelve pending_payment + checkout_url (pago hospedado Stripe); el estado final se consulta con get_order. Reintenta con la MISMA idempotency_key.",
+      "Buys tickets for an event while honoring the user's spend_limit. Requires an API key (Authorization: Bearer header). Returns pending_payment + checkout_url (Stripe hosted payment); check the final status with get_order. Retry with the SAME idempotency_key.",
       buyTicketInputSchema.shape,
       async (args, extra) =>
         run(async () => {
@@ -113,13 +113,13 @@ const handler = createMcpHandler(
           if (!keyId) {
             return toolError(
               "unauthorized",
-              "se requiere API key: header Authorization: Bearer <key>",
+              "API key required: Authorization: Bearer <key> header",
             );
           }
           if (apiKeyRateLimited(keyId)) {
             return toolError(
               "rate_limited",
-              "límite de compras por minuto excedido; reintenta en un momento",
+              "per-minute purchase limit exceeded; retry in a moment",
             );
           }
           return ok(await getPurchaseCore().run(args, mcpRail));
@@ -128,20 +128,20 @@ const handler = createMcpHandler(
 
     server.tool(
       "get_order",
-      "Estado de una orden (pending_payment → confirmed). Al confirmarse incluye tickets[] y el path del .ics.",
+      "Status of an order (pending_payment → confirmed). Once confirmed it includes tickets[] and the .ics path.",
       { order_id: z.string().min(1).max(64) },
       async ({ order_id }) =>
         run(async () => {
           const result = await getPurchaseCore().getOrderResult(order_id);
           if (!result)
-            return toolError("invalid_intent", "order_id inexistente");
+            return toolError("invalid_intent", "order_id does not exist");
           return ok(mcpRail.formatResult(result));
         }),
     );
 
     server.tool(
       "set_reminder",
-      "Agenda un recordatorio por email para un evento de OpenTicket (requiere event_id u order_id) y devuelve el .ics con alarmas. Default: 24h y 1h antes.",
+      "Schedules an email reminder for an OpenTicket event (requires event_id or order_id) and returns the .ics with alarms. Default: 24h and 1h before.",
       {
         event_id: z.string().min(1).max(64).optional(),
         order_id: z.string().min(1).max(64).optional(),
@@ -156,7 +156,7 @@ const handler = createMcpHandler(
           if (!event_id && !order_id) {
             return toolError(
               "invalid_intent",
-              "se requiere event_id u order_id (adapter Q3)",
+              "event_id or order_id required (adapter Q3)",
             );
           }
           let ev: {
@@ -169,7 +169,7 @@ const handler = createMcpHandler(
           if (order_id) {
             const detail = await getStore().getOrderDetail(order_id);
             if (!detail)
-              return toolError("invalid_intent", "order_id inexistente");
+              return toolError("invalid_intent", "order_id does not exist");
             ev = detail.event;
           } else if (event_id) {
             ev = await getPublishedEvent(event_id);
@@ -177,7 +177,7 @@ const handler = createMcpHandler(
           if (!ev) {
             return toolError(
               "event_unavailable",
-              "event_id inexistente o no publicado",
+              "event_id does not exist or is not published",
             );
           }
           const reminderId = randomId("rem");
@@ -215,7 +215,7 @@ const handler = createMcpHandler(
   },
 );
 
-// required:false → discovery pasa sin key; buy_ticket exige authInfo por dentro.
+// required:false → discovery passes without a key; buy_ticket enforces authInfo internally.
 const authed = withMcpAuth(handler, verifyApiKeyToken, { required: false });
 
 export { authed as GET, authed as POST, authed as DELETE };

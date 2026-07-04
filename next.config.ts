@@ -1,17 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Builds de verificación (CI/agente) a un dir aparte: `next build` sobre el
-  // .next de un `next dev` activo invalida sus assets y la pestaña abierta
-  // entra en loop de full-reload. Uso: NEXT_DIST_DIR=.next-build pnpm build
+  // Verification builds (CI/agent) go to a separate dir: running `next build`
+  // over the .next of an active `next dev` invalidates its assets and the open
+  // tab falls into a full-reload loop. Usage: NEXT_DIST_DIR=.next-build pnpm build
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  // Cache Components (PPR): páginas de evento y feed usan `use cache`
-  // + cacheLife/cacheTag; invalidación con revalidateTag (route handlers)
-  // y updateTag (server actions). Nada de unstable_cache legacy.
+  // Cache Components (PPR): event pages and the feed use `use cache`
+  // + cacheLife/cacheTag; invalidation via revalidateTag (route handlers)
+  // and updateTag (server actions). No legacy unstable_cache.
   cacheComponents: true,
   experimental: {
-    // View Transitions (React 19 <ViewTransition>): la web humana lo usa en F1;
-    // en F0 queda habilitado + ejemplo mínimo en la página de evento.
+    // View Transitions (React 19 <ViewTransition>): the human web uses it in F1;
+    // in F0 it stays enabled + a minimal example on the event page.
     viewTransition: true,
   },
 };

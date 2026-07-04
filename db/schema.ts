@@ -1,11 +1,11 @@
 /**
- * Schema Drizzle — data-model.md con los fixes obligatorios de SYNTHESIS §3:
- *  - UNIQUE (rail, buyer_email, idempotency_key) — nunca global (P4)
- *  - tabla processed_stripe_event para dedup de webhooks (P3)
- *  - CHECK issued + reserved <= quota — anti-oversell en DB, no en app
- *  - order_item colapsado en orders (D4: v1 vende 1 ticket_type por orden)
+ * Drizzle schema — data-model.md with the mandatory fixes from SYNTHESIS §3:
+ *  - UNIQUE (rail, buyer_email, idempotency_key) — never global (P4)
+ *  - processed_stripe_event table for webhook dedup (P3)
+ *  - CHECK issued + reserved <= quota — anti-oversell in the DB, not the app
+ *  - order_item collapsed into orders (D4: v1 sells 1 ticket_type per order)
  *
- * Drizzle Kit es el dueño único del schema (A6). `pnpm db:generate && db:push`.
+ * Drizzle Kit is the sole owner of the schema (A6). `pnpm db:generate && db:push`.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -70,7 +70,7 @@ export const organizer = pgTable("organizer", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  /** scrypt `salt:hash` (lib/password.ts). Null = cuenta seed sin login. */
+  /** scrypt `salt:hash` (lib/password.ts). Null = seed account without login. */
   passwordHash: text("password_hash"),
   stripeAccountId: text("stripe_account_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -92,7 +92,7 @@ export const event = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     timezone: text("timezone").notNull().default("America/Bogota"),
-    /** ISO 4217 — fija la moneda de todos sus ticket_type (Q4). USD en demo (D5). */
+    /** ISO 4217 — fixes the currency of all its ticket_types (Q4). USD in the demo (D5). */
     currency: text("currency").notNull(),
     status: eventStatusEnum("status").notNull().default("draft"),
     imageUrl: text("image_url"),
@@ -118,7 +118,7 @@ export const ticketType = pgTable(
     status: ticketTypeStatusEnum("status").notNull().default("active"),
   },
   (t) => [
-    // Invariante crítico (PRD §7): red final anti-oversell EN LA DB.
+    // Critical invariant (PRD §7): final anti-oversell safety net IN THE DB.
     check(
       "inventory_within_quota",
       sql`${t.issued} + ${t.reserved} <= ${t.quota}`,
@@ -137,7 +137,7 @@ export const orders = pgTable(
     eventId: text("event_id")
       .notNull()
       .references(() => event.id),
-    /** D4: order_item colapsado — v1 vende un solo ticket_type por orden. */
+    /** D4: order_item collapsed — v1 sells a single ticket_type per order. */
     ticketTypeId: text("ticket_type_id")
       .notNull()
       .references(() => ticketType.id),
@@ -163,8 +163,8 @@ export const orders = pgTable(
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   },
   (t) => [
-    // Fix P4: idempotencia con SCOPE DE COMPRADOR — un agente no puede leer
-    // la orden de otro colisionando la key.
+    // Fix P4: BUYER-SCOPED idempotency — an agent cannot read another
+    // agent's order by colliding the key.
     uniqueIndex("orders_idempotency_scope_uq").on(
       t.rail,
       t.buyerEmail,
@@ -172,7 +172,7 @@ export const orders = pgTable(
     ),
     index("orders_event_status_idx").on(t.eventId, t.status),
     index("orders_status_expires_idx").on(t.status, t.expiresAt),
-    // barrido perezoso por ticket_type (A7)
+    // lazy sweep per ticket_type (A7)
     index("orders_tt_status_expires_idx").on(
       t.ticketTypeId,
       t.status,
@@ -220,7 +220,7 @@ export const reminder = pgTable("reminder", {
     .defaultNow(),
 });
 
-/** Append-only, público, SIN PII (FR 13). */
+/** Append-only, public, NO PII (FR 13). */
 export const tickerEvent = pgTable(
   "ticker_event",
   {
@@ -249,10 +249,10 @@ export const digestSubscriber = pgTable("digest_subscriber", {
 });
 
 /**
- * API keys para el canal agéntico de compra (README paso 7, PRD FR-11).
- * Guardamos SHA-256 hex de la key cruda (alta entropía → sin salt): lookup
- * determinista por hash. La key en claro solo se ve al crearla. Los GET de
- * descubrimiento no la necesitan; sí `buy_ticket` (MCP).
+ * API keys for the agentic purchase channel (README step 7, PRD FR-11).
+ * We store the SHA-256 hex of the raw key (high entropy → no salt): deterministic
+ * lookup by hash. The plaintext key is only shown at creation time. Discovery
+ * GETs don't need it; `buy_ticket` (MCP) does.
  */
 export const apiKey = pgTable("api_key", {
   id: text("id").primaryKey(), // key_...
@@ -265,11 +265,11 @@ export const apiKey = pgTable("api_key", {
 });
 
 /**
- * Fix P3 (idempotencia de webhooks): el handler hace INSERT ... ON CONFLICT
- * DO NOTHING con el event.id de Stripe; si no insertó, ya fue procesado.
+ * Fix P3 (webhook idempotency): the handler does INSERT ... ON CONFLICT
+ * DO NOTHING with the Stripe event.id; if nothing was inserted, it was already processed.
  */
 export const processedStripeEvent = pgTable("processed_stripe_event", {
-  id: text("id").primaryKey(), // event.id de Stripe (evt_...)
+  id: text("id").primaryKey(), // Stripe event.id (evt_...)
   processedAt: timestamp("processed_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

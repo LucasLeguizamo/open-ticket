@@ -1,7 +1,7 @@
 /**
- * Composición de dependencias — el ÚNICO lugar donde el core conoce sus
- * implementaciones reales (Drizzle, Stripe, Resend). Lazy: nada conecta
- * en build time.
+ * Dependency composition — the ONLY place where the core knows its real
+ * implementations (Drizzle, Stripe, Resend). Lazy: nothing connects at
+ * build time.
  */
 import { PurchaseCore } from "@/core/adapter/purchase-core";
 import type { StorePort } from "@/core/ports";

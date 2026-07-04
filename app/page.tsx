@@ -1,6 +1,6 @@
 /**
- * Landing dev-native / estética CLI (FR 15): el agente es el protagonista.
- * Hero + snippet de integración MCP + ticker en vivo + próximos eventos.
+ * Dev-native landing / CLI aesthetic (FR 15): the agent is the protagonist.
+ * Hero + MCP integration snippet + live ticker + upcoming events.
  */
 
 import { connection } from "next/server";
@@ -16,12 +16,12 @@ const MCP_SNIPPET = `{
 # tools: search_events · get_ticket · buy_ticket · get_order · set_reminder`;
 
 async function UpcomingEvents() {
-  await connection(); // request-time: la lista y el "available" son dinámicos
+  await connection(); // request-time: the list and "available" are dynamic
   const events = await searchEvents(undefined, 6);
   if (events.length === 0) {
     return (
       <p className="text-neutral-600">
-        $ openticket events → (vacío) crea el primero
+        $ openticket events → (empty) create the first one
       </p>
     );
   }
@@ -61,7 +61,7 @@ export default function Home() {
       <nav className="flex justify-between text-neutral-500">
         <span>openticket</span>
         <a className="underline hover:text-green-500" href="/organizer">
-          organizadores → login
+          organizers → login
         </a>
       </nav>
       <header className="space-y-3">
@@ -71,27 +71,27 @@ export default function Home() {
           <span className="animate-pulse">▌</span>
         </h1>
         <p className="text-neutral-400">
-          Ticketing agent-native: cada ticket es descubrible y comprable por un
-          agente vía <span className="text-green-500">MCP</span> (ACP y x402 en
-          camino). Pago con Stripe, recordatorio .ics automático.
+          Agent-native ticketing: every ticket is discoverable and buyable by an
+          agent via <span className="text-green-500">MCP</span> (ACP and x402 on
+          the way). Stripe payments, automatic .ics reminder.
         </p>
       </header>
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># conecta tu agente (Claude, etc.)</p>
+        <p className="text-neutral-500"># connect your agent (Claude, etc.)</p>
         <pre className="overflow-x-auto rounded border border-neutral-800 bg-neutral-950 p-4 text-green-400">
           {MCP_SNIPPET}
         </pre>
       </section>
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># actividad en vivo</p>
+        <p className="text-neutral-500"># live activity</p>
         <LiveTicker />
       </section>
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># próximos eventos</p>
-        <Suspense fallback={<p className="text-neutral-600">$ cargando…</p>}>
+        <p className="text-neutral-500"># upcoming events</p>
+        <Suspense fallback={<p className="text-neutral-600">$ loading…</p>}>
           <UpcomingEvents />
         </Suspense>
       </section>

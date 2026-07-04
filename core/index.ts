@@ -1,6 +1,6 @@
 /**
- * Superficie pública del core — lo que exportaría el paquete
- * `@openticket/agent-commerce-adapter` al extraerse.
+ * Public surface of the core — what the `@openticket/agent-commerce-adapter`
+ * package would export once extracted.
  */
 
 export * from "./adapter/errors";

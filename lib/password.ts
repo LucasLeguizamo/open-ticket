@@ -1,7 +1,7 @@
 /**
- * Hash de contraseñas con scrypt de node:crypto — sin dependencias (auth
- * email+contraseña mínima para organizadores; Supabase Auth queda como
- * upgrade si hace falta OAuth/magic links).
+ * Password hashing with scrypt from node:crypto — zero dependencies (minimal
+ * email+password auth for organizers; Supabase Auth remains an upgrade path
+ * if OAuth/magic links are ever needed).
  */
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 

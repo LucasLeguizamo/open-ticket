@@ -1,6 +1,6 @@
 "use client";
 
-/** Ticker en vivo de la landing — consume /api/ticker (SSE, FR 13). */
+/** Live ticker on the landing page — consumes /api/ticker (SSE, FR 13). */
 import { useEffect, useState } from "react";
 
 interface TickerLine {
@@ -19,7 +19,7 @@ export function LiveTicker() {
   useEffect(() => {
     const es = new EventSource("/api/ticker");
     es.onopen = () => setLive(true);
-    es.onerror = () => setLive(false); // EventSource reconecta solo
+    es.onerror = () => setLive(false); // EventSource reconnects on its own
     es.onmessage = (e) => {
       const line = JSON.parse(e.data) as TickerLine;
       setLines((prev) =>
@@ -39,7 +39,7 @@ export function LiveTicker() {
       </p>
       <ul className="mt-2 space-y-1">
         {lines.length === 0 && (
-          <li className="text-neutral-600">esperando actividad…</li>
+          <li className="text-neutral-600">waiting for activity…</li>
         )}
         {[...lines].reverse().map((l) => (
           <li key={l.id}>

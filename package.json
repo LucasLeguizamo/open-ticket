@@ -2,7 +2,7 @@
   "name": "open-ticket",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenTicket — agent-native ticketing. Core de compra (AgentCommerceAdapter) framework-free, extraíble como paquete.",
+  "description": "OpenTicket — agent-native ticketing. Every ticket is discoverable and purchasable by an AI agent (MCP today; ACP/x402 next), paid via Stripe.",
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "repository": {

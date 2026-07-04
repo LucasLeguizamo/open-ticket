@@ -1,10 +1,10 @@
 /**
- * API keys del canal de compra agéntico (README paso 7, PRD FR-11).
+ * API keys for the agentic purchase channel (README step 7, PRD FR-11).
  *
- * La key cruda es alta entropía (`ot_live_<40 hex>`) → SHA-256 sin salt alcanza
- * para un lookup determinista y resistente a timing (no hay comparación de
- * secretos en app: el índice unique de la DB hace el match). Solo se ve en claro
- * al crearla.
+ * The raw key is high entropy (`ot_live_<40 hex>`) → unsalted SHA-256 is enough
+ * for a deterministic, timing-safe lookup (no secret comparison happens in the
+ * app: the DB's unique index does the matching). The key is only visible in
+ * plaintext at creation time.
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
@@ -17,7 +17,7 @@ export function hashApiKey(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
-/** Genera una key nueva. Devuelve la fila a insertar + la key en claro (única vez). */
+/** Generates a new key. Returns the row to insert + the plaintext key (shown only once). */
 export function generateApiKey(label = ""): {
   raw: string;
   row: typeof apiKey.$inferInsert;
@@ -29,7 +29,7 @@ export function generateApiKey(label = ""): {
   };
 }
 
-/** Busca la key por hash; null si no existe o está revocada. */
+/** Looks up the key by hash; null if it does not exist or has been revoked. */
 export async function verifyApiKey(
   raw: string,
 ): Promise<{ id: string } | null> {
@@ -42,7 +42,7 @@ export async function verifyApiKey(
   return rows[0] ?? null;
 }
 
-/** verifyToken para withMcpAuth (required:false): sin key válida → sin authInfo. */
+/** verifyToken for withMcpAuth (required:false): no valid key → no authInfo. */
 export async function verifyApiKeyToken(
   _req: Request,
   bearerToken?: string,
@@ -53,9 +53,9 @@ export async function verifyApiKeyToken(
   return { token: bearerToken, clientId: rec.id, scopes: ["buy_ticket"] };
 }
 
-// ponytail: rate-limit en memoria por key (30 compras/min). Best-effort — en
-// Vercel serverless no cruza instancias. Subir a Redis/KV (mcp-handler ya soporta
-// redisUrl) si el abuso real lo justifica; alcanza para v1.
+// ponytail: in-memory rate limit per key (30 purchases/min). Best-effort — on
+// Vercel serverless it does not span instances. Upgrade to Redis/KV (mcp-handler
+// already supports redisUrl) if real abuse warrants it; good enough for v1.
 const HITS = new Map<string, { count: number; resetAt: number }>();
 const LIMIT = 30;
 const WINDOW_MS = 60_000;

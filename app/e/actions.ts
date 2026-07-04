@@ -1,8 +1,8 @@
 "use server";
 
 /**
- * Compra humana desde la página del evento (rail web, US-004): mismo
- * PurchaseCore que los agentes → redirect al checkout hospedado de Stripe.
+ * Human purchase from the event page (web rail, US-004): same PurchaseCore
+ * as the agents → redirect to Stripe's hosted checkout.
  */
 import { redirect } from "next/navigation";
 import { isAgentCommerceError, randomId, webRail } from "@/core";
@@ -16,7 +16,7 @@ export async function buyWeb(formData: FormData): Promise<void> {
     quantity: Math.floor(Number(formData.get("quantity") ?? 1)),
     buyer_email: String(formData.get("buyer_email") ?? ""),
     buyer_name: String(formData.get("buyer_name") ?? "") || undefined,
-    // el navegador no reintenta con la misma key: una compra por submit
+    // the browser does not retry with the same key: one purchase per submit
     idempotency_key: randomId("web"),
   };
   let checkoutUrl: string | null;

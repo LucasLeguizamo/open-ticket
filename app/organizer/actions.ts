@@ -1,9 +1,9 @@
 "use server";
 
 /**
- * Server actions del organizador: auth email+contraseña (US-001 / FR 11)
- * y CRUD mínimo de eventos. Errores van por querystring (?error=...) —
- * sin estado de cliente.
+ * Organizer server actions: email+password auth (US-001 / FR 11) and
+ * minimal event CRUD. Errors travel via querystring (?error=...) —
+ * no client state.
  */
 import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
@@ -93,7 +93,7 @@ const createEventSchema = z.object({
   venue: z.string().max(200),
   starts_at: z
     .string()
-    .refine((v) => !Number.isNaN(Date.parse(v)), "fecha inválida"),
+    .refine((v) => !Number.isNaN(Date.parse(v)), "invalid date"),
   currency: z.enum(["USD", "COP"]),
   image_url: z.union([z.string().url().max(500), z.literal("")]),
 });
@@ -106,7 +106,7 @@ function slugify(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
-  // sufijo aleatorio siempre → URL corta sin chequeo de colisión
+  // always a random suffix → short URL without collision checks
   return `${base}-${randomId("", 4).slice(1)}`;
 }
 
@@ -122,7 +122,7 @@ export async function createEvent(formData: FormData): Promise<void> {
   });
   if (!parsed.success) redirect("/organizer?error=evento_invalido");
 
-  // ticket types: filas paralelas del form (hasta 5)
+  // ticket types: parallel form rows (up to 5)
   const names = formData.getAll("tt_name").map(String);
   const prices = formData.getAll("tt_price").map(String);
   const quotas = formData.getAll("tt_quota").map(String);
@@ -135,7 +135,7 @@ export async function createEvent(formData: FormData): Promise<void> {
     .filter((t) => t.name.length > 0)
     .map((t) => ({
       name: t.name.slice(0, 100),
-      // precio en unidades mayores → minor (x100; USD y COP usan 2 decimales en Stripe)
+      // price in major units → minor (x100; USD and COP use 2 decimals in Stripe)
       priceMinor: Math.round(Number(t.price ?? "0") * 100),
       quota: Math.floor(Number(t.quota ?? "0")),
     }));
@@ -188,7 +188,7 @@ export async function publishEvent(formData: FormData): Promise<void> {
     .where(
       and(
         eq(event.id, eventId),
-        eq(event.organizerId, organizerId), // ownership: nadie publica lo ajeno
+        eq(event.organizerId, organizerId), // ownership: nobody publishes someone else's event
         eq(event.status, "draft"),
       ),
     )

@@ -1,18 +1,18 @@
 /**
- * Ticker público en vivo (FR 13) — SSE consumible por la landing y por
- * cualquier cliente (`curl -N /api/ticker`). Sin PII: solo lo que ya expone
- * la tabla ticker_event.
+ * Public live ticker (FR 13) — SSE consumable by the landing page and by
+ * any client (`curl -N /api/ticker`). No PII: only what the ticker_event
+ * table already exposes.
  *
- * ponytail: polling a la DB cada 2.5s. Con Supabase Realtime (o LISTEN/NOTIFY)
- * esto se reemplaza por push real; el contrato SSE hacia el cliente no cambia.
- * En Vercel la función expira a los ~300s y EventSource reconecta solo.
+ * ponytail: polls the DB every 2.5s. With Supabase Realtime (or LISTEN/NOTIFY)
+ * this becomes real push; the SSE contract toward the client does not change.
+ * On Vercel the function expires at ~300s and EventSource reconnects on its own.
  */
 import { desc, gte } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tickerEvent } from "@/db/schema";
 
 const POLL_MS = 2500;
-const HEARTBEAT_EVERY = 6; // ~15s sin novedades → comentario keep-alive
+const HEARTBEAT_EVERY = 6; // ~15s without news → keep-alive comment
 
 export async function GET(req: Request): Promise<Response> {
   const db = getDb();
@@ -23,8 +23,8 @@ export async function GET(req: Request): Promise<Response> {
       let cursor = new Date(0);
       let quietPolls = 0;
       let closed = false;
-      // Postgres guarda µs y Date trunca a ms → cursor gte + dedupe por id.
-      // El Set crece ≤ ~centenares por conexión (Vercel corta a ~300s): ok.
+      // Postgres stores µs and Date truncates to ms → gte cursor + dedupe by id.
+      // The Set grows ≤ ~hundreds per connection (Vercel cuts off at ~300s): ok.
       const seen = new Set<string>();
 
       const send = (row: typeof tickerEvent.$inferSelect) => {
@@ -73,14 +73,14 @@ export async function GET(req: Request): Promise<Response> {
           quietPolls = 0;
           for (const row of rows) send(row);
         } catch {
-          // conexión cerrada o DB caída: cerrar limpio, el cliente reconecta
+          // connection closed or DB down: close cleanly, the client reconnects
           if (!closed) {
             closed = true;
             clearInterval(timer);
             try {
               controller.close();
             } catch {
-              /* ya cerrado */
+              /* already closed */
             }
           }
         }
@@ -92,7 +92,7 @@ export async function GET(req: Request): Promise<Response> {
         try {
           controller.close();
         } catch {
-          /* ya cerrado */
+          /* already closed */
         }
       });
     },

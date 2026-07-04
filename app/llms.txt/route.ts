@@ -1,30 +1,30 @@
 /**
- * llms.txt (README paso 3, formato llmstxt.org) — cómo un agente que NO habla
- * MCP descubre y compra en OpenTicket. Route handler (no archivo estático) para
- * que las URLs usen el host real de cada entorno (preview/prod), sin placeholder.
+ * llms.txt (README step 3, llmstxt.org format) — how an agent that does NOT
+ * speak MCP discovers and buys on OpenTicket. Route handler (not a static file)
+ * so URLs use the real host of each environment (preview/prod), no placeholder.
  */
 export function GET(req: Request): Response {
   const origin = new URL(req.url).origin;
   const body = `# OpenTicket
 
-> Ticketing agent-native: cada ticket es descubrible y comprable por un agente
-> de IA. Pago con Stripe (checkout hospedado). "Your agent handles the checkout."
+> Agent-native ticketing: every ticket is discoverable and buyable by an AI
+> agent. Payments via Stripe (hosted checkout). "Your agent handles the checkout."
 
-## Descubrimiento
-- [Feed de eventos (JSON)](${origin}/api/events): eventos publicados + tipos de ticket con precio (unidades mínimas), moneda ISO 4217 y cupo disponible.
-- [Ticker en vivo (SSE)](${origin}/api/ticker): stream de actividad pública, sin PII.
-- [OpenAPI 3.1](${origin}/openapi.json): spec de los endpoints públicos.
+## Discovery
+- [Events feed (JSON)](${origin}/api/events): published events + ticket types with price (minor units), ISO 4217 currency and available quota.
+- [Live ticker (SSE)](${origin}/api/ticker): public activity stream, no PII.
+- [OpenAPI 3.1](${origin}/openapi.json): spec of the public endpoints.
 
-## Compra vía MCP (recomendado)
-- Servidor MCP (streamable HTTP): ${origin}/api/mcp
+## Buying via MCP (recommended)
+- MCP server (streamable HTTP): ${origin}/api/mcp
 - Tools: search_events, get_ticket, buy_ticket, set_reminder.
-- buy_ticket devuelve pending_payment + checkout_url (Stripe). Consultá el estado con get_order.
-- Reintentá SIEMPRE con la misma idempotency_key (la generás vos, cliente).
-- Errores estructurados: sold_out, mandate_exceeded, invalid_intent.
+- buy_ticket returns pending_payment + checkout_url (Stripe). Check the status with get_order.
+- ALWAYS retry with the same idempotency_key (you, the client, generate it).
+- Structured errors: sold_out, mandate_exceeded, invalid_intent.
 
-## Notas
-- Respetá el spend_limit del usuario en buy_ticket.
-- Los GET de descubrimiento no requieren auth. La compra puede requerir API key al abrir el feed público.
+## Notes
+- Honor the user's spend_limit in buy_ticket.
+- Discovery GETs require no auth. Buying may require an API key once the public feed opens up.
 `;
   return new Response(body, {
     headers: {

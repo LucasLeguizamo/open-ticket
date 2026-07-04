@@ -1,7 +1,7 @@
 /**
- * DrizzleStore — implementación Postgres del StorePort del core.
- * Acá vive TODA la atomicidad: UPDATEs condicionales + transacciones.
- * El core decide política; esta capa garantiza consistencia.
+ * DrizzleStore — Postgres implementation of the core's StorePort.
+ * ALL atomicity lives here: conditional UPDATEs + transactions.
+ * The core decides policy; this layer guarantees consistency.
  */
 import { and, eq, lt, sql } from "drizzle-orm";
 import type { Order, Rail, TicketSeed } from "../core/adapter/types";
@@ -96,8 +96,8 @@ export class DrizzleStore implements StorePort {
     quantity: number,
   ): Promise<boolean> {
     return this.db.transaction(async (tx) => {
-      // Expiración PEREZOSA (A7): liberar reservas vencidas de este ticket_type
-      // antes de evaluar disponibilidad. La corrección no depende de ningún cron.
+      // LAZY expiration (A7): release expired reservations for this ticket_type
+      // before evaluating availability. Correctness does not depend on any cron.
       const expired = await tx
         .update(orders)
         .set({ status: "expired" })
@@ -117,8 +117,8 @@ export class DrizzleStore implements StorePort {
           .where(eq(ticketType.id, ticketTypeId));
       }
 
-      // LA reserva atómica (data-model §4): el WHERE re-evalúa sobre la fila
-      // lockeada — bajo concurrencia solo pasan los que caben en la quota.
+      // THE atomic reservation (data-model §4): the WHERE re-evaluates on the
+      // locked row — under concurrency only those that fit within the quota pass.
       const updated = await tx
         .update(ticketType)
         .set({ reserved: sql`${ticketType.reserved} + ${quantity}` })
@@ -177,7 +177,7 @@ export class DrizzleStore implements StorePort {
       })
       .returning();
     if (inserted[0]) return { order: mapOrder(inserted[0]), created: true };
-    // Perdió el race de reintentos paralelos: devolver la orden ganadora.
+    // Lost the parallel retry race: return the winning order.
     const existing = await this.findOrderByIdempotency(
       input.rail,
       input.buyerEmail,
@@ -185,7 +185,7 @@ export class DrizzleStore implements StorePort {
     );
     if (!existing) {
       throw new Error(
-        "conflicto de idempotencia sin orden existente (inconsistencia)",
+        "idempotency conflict without an existing order (inconsistency)",
       );
     }
     return { order: existing, created: false };
@@ -220,7 +220,7 @@ export class DrizzleStore implements StorePort {
           ticketTypeId: orders.ticketTypeId,
         });
       const row = rows[0];
-      if (!row) return false; // ya no estaba pending: no-op idempotente
+      if (!row) return false; // no longer pending: idempotent no-op
       await tx
         .update(ticketType)
         .set({ reserved: sql`${ticketType.reserved} - ${row.quantity}` })
@@ -235,8 +235,8 @@ export class DrizzleStore implements StorePort {
     seeds: TicketSeed[],
   ): Promise<ConfirmOutcome> {
     return this.db.transaction(async (tx) => {
-      // EL LOCK DE EMISIÓN (P3): transición condicional. Dos webhooks
-      // concurrentes → uno afecta 1 fila y emite; el otro afecta 0 y sale.
+      // THE ISSUANCE LOCK (P3): conditional transition. Two concurrent
+      // webhooks → one affects 1 row and issues; the other affects 0 and exits.
       const rows = await tx
         .update(orders)
         .set({
@@ -265,7 +265,7 @@ export class DrizzleStore implements StorePort {
         return { outcome: "not_pending", status: cur.status };
       }
 
-      // reservado → emitido (misma tx; CHECK constraints vigilan)
+      // reserved → issued (same tx; CHECK constraints keep watch)
       await tx
         .update(ticketType)
         .set({
@@ -286,7 +286,7 @@ export class DrizzleStore implements StorePort {
         })),
       );
 
-      // ticker público sin PII (FR 13)
+      // public ticker without PII (FR 13)
       const evRows = await tx
         .select({ title: event.title })
         .from(event)

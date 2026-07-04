@@ -1,11 +1,11 @@
 /**
- * OpenAPI 3.1 de los endpoints públicos (README paso 4).
+ * OpenAPI 3.1 for the public endpoints (README step 4).
  *
- * ponytail: escrito a mano. El README pedía generarlo con zod-to-openapi para
- * no desincronizar, pero la superficie pública son 4 rutas simples y solo una
- * (subscribe) tiene schema Zod. No vale una dep nueva todavía. Ceiling: cuando
- * el feed ACP formal (F2) exponga los schemas de core/adapter/rails/schemas.ts,
- * migrar a generación desde Zod y borrar este literal.
+ * ponytail: hand-written. The README asked to generate it with zod-to-openapi
+ * to avoid drift, but the public surface is 4 simple routes and only one
+ * (subscribe) has a Zod schema. Not worth a new dep yet. Ceiling: once the
+ * formal ACP feed (F2) exposes the schemas from core/adapter/rails/schemas.ts,
+ * migrate to Zod-based generation and delete this literal.
  */
 export function GET(req: Request): Response {
   const origin = new URL(req.url).origin;
@@ -15,25 +15,25 @@ export function GET(req: Request): Response {
       title: "OpenTicket — Public API",
       version: "0.1.0",
       description:
-        "Endpoints públicos de descubrimiento agéntico. La compra se hace por MCP (/api/mcp).",
+        "Public endpoints for agentic discovery. Purchases go through MCP (/api/mcp).",
     },
     servers: [{ url: origin }],
     paths: {
       "/api/events": {
         get: {
-          summary: "Feed de eventos publicados",
+          summary: "Feed of published events",
           parameters: [
             {
               name: "q",
               in: "query",
               required: false,
               schema: { type: "string", maxLength: 200 },
-              description: "Texto libre; vacío = próximos eventos.",
+              description: "Free text; empty = upcoming events.",
             },
           ],
           responses: {
             "200": {
-              description: "Eventos con sus tipos de ticket",
+              description: "Events with their ticket types",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/EventsResponse" },
@@ -45,10 +45,10 @@ export function GET(req: Request): Response {
       },
       "/api/ticker": {
         get: {
-          summary: "Ticker de actividad en vivo (SSE)",
+          summary: "Live activity ticker (SSE)",
           responses: {
             "200": {
-              description: "Stream text/event-stream de TickerEvent",
+              description: "text/event-stream of TickerEvent",
               content: { "text/event-stream": {} },
             },
           },
@@ -56,7 +56,7 @@ export function GET(req: Request): Response {
       },
       "/api/newsletter/subscribe": {
         post: {
-          summary: "Suscribir un email al digest",
+          summary: "Subscribe an email to the digest",
           requestBody: {
             required: true,
             content: {
@@ -72,8 +72,8 @@ export function GET(req: Request): Response {
             },
           },
           responses: {
-            "200": { description: "Suscrito" },
-            "400": { description: "Email inválido" },
+            "200": { description: "Subscribed" },
+            "400": { description: "Invalid email" },
             "429": { description: "Rate limit" },
           },
         },

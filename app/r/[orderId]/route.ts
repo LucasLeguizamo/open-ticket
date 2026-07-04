@@ -1,6 +1,6 @@
 /**
- * .ics on-demand por orden confirmada (architecture-review D3: no se persiste).
- * El id de orden es no-adivinable (randomId) — funciona como capability URL.
+ * On-demand .ics per confirmed order (architecture-review D3: not persisted).
+ * The order id is unguessable (randomId) — it works as a capability URL.
  */
 import { generateIcs } from "@/core";
 import { getStore } from "@/lib/context";
