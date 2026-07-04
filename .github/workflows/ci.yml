@@ -1,0 +1,47 @@
+# CI mínimo (test-strategy §5.4): lint → unit → integración (Postgres real) → build.
+# El user/db del service matchea .env.test (test/setup.ts la carga con override).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lucas
+          POSTGRES_DB: openticket_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lucas"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://lucas@localhost:5432/openticket_test
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_test_dummy
+      AUTH_SECRET: ci-only-secret-abcdef123456
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      EMAIL_FROM: OpenTicket <test@example.com>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm db:push
+      - run: pnpm test:integration
+      - run: pnpm build
