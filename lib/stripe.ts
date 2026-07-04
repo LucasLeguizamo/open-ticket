@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import type { PaymentPort } from "@/core/ports";
+import type { ChargeOffSessionResult, PaymentPort } from "@/core/ports";
 
 let _stripe: Stripe | undefined;
 
@@ -55,6 +55,59 @@ export function createStripePaymentPort(): PaymentPort {
       });
       if (!session.url) throw new Error("Stripe did not return a checkout URL");
       return { checkoutUrl: session.url, sessionId: session.id };
+    },
+
+    async chargeOffSession(input): Promise<ChargeOffSessionResult> {
+      const stripe = getStripe(); // GUARD test-only intact
+      try {
+        const pi = await stripe.paymentIntents.create(
+          {
+            amount: input.amountMinor,
+            currency: input.currency.toLowerCase(),
+            customer: input.customerId,
+            payment_method: input.paymentMethodId,
+            off_session: true,
+            confirm: true,
+            description: input.description,
+            metadata: { order_id: input.orderId },
+          },
+          // de-dup at Stripe level: same order → same PaymentIntent, no double charge
+          { idempotencyKey: `pi_${input.idempotencyKey}` },
+        );
+        // confirm:true + off_session → normally "succeeded", or throws StripeCardError.
+        if (pi.status === "succeeded") {
+          return { status: "succeeded", paymentIntentId: pi.id };
+        }
+        // Defensive: if a status ever comes back without a throw, map it too.
+        if (pi.status === "requires_action") {
+          return { status: "requires_action", paymentIntentId: pi.id };
+        }
+        return {
+          status: "failed",
+          paymentIntentId: pi.id,
+          failureReason: pi.status,
+        };
+      } catch (err) {
+        // off_session 3DS does NOT return as status "requires_action": Stripe
+        // THROWS a StripeCardError with the payment_intent attached.
+        if (err instanceof Stripe.errors.StripeCardError) {
+          const pi = err.payment_intent;
+          if (err.code === "authentication_required") {
+            return {
+              status: "requires_action",
+              paymentIntentId: pi?.id ?? null,
+            };
+          }
+          // card_declined and any other card error → decline.
+          return {
+            status: "failed",
+            paymentIntentId: pi?.id ?? null,
+            failureReason: err.decline_code ?? err.code ?? "card_declined",
+          };
+        }
+        // Non-card errors (network, config) bubble up; the core releases + payment_failed.
+        throw err;
+      }
     },
   };
 }

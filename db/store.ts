@@ -22,9 +22,20 @@ import {
   tickerEvent,
   ticket,
   ticketType,
+  wallet,
 } from "./schema";
 
 type OrderRow = typeof orders.$inferSelect;
+
+/** Agent wallet row (design-wallet.md §1). One wallet per api_key. */
+export type Wallet = typeof wallet.$inferSelect;
+
+export interface UpsertWalletInput {
+  id: string;
+  apiKeyId: string;
+  stripeCustomerId: string;
+  stripePaymentMethodId: string;
+}
 
 function mapOrder(row: OrderRow): Order {
   return {
@@ -353,5 +364,37 @@ export class DrizzleStore implements StorePort {
       .onConflictDoNothing({ target: processedStripeEvent.id })
       .returning({ id: processedStripeEvent.id });
     return inserted.length === 1;
+  }
+
+  /** Wallet lookup by the authenticated agent's api_key.id (design-wallet.md §4). */
+  async getWalletByApiKeyId(apiKeyId: string): Promise<Wallet | null> {
+    const rows = await this.db
+      .select()
+      .from(wallet)
+      .where(eq(wallet.apiKeyId, apiKeyId))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Upsert the wallet for an api_key (design-wallet.md §5.1 load-wallet script):
+   * re-running the loader must not break the api_key_id UNIQUE.
+   */
+  async upsertWallet(input: UpsertWalletInput): Promise<void> {
+    await this.db
+      .insert(wallet)
+      .values({
+        id: input.id,
+        apiKeyId: input.apiKeyId,
+        stripeCustomerId: input.stripeCustomerId,
+        stripePaymentMethodId: input.stripePaymentMethodId,
+      })
+      .onConflictDoUpdate({
+        target: wallet.apiKeyId,
+        set: {
+          stripeCustomerId: input.stripeCustomerId,
+          stripePaymentMethodId: input.stripePaymentMethodId,
+        },
+      });
   }
 }

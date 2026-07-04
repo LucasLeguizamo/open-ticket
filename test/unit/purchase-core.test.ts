@@ -8,9 +8,14 @@ import {
   isAgentCommerceError,
 } from "@/core/adapter/errors";
 import { PurchaseCore } from "@/core/adapter/purchase-core";
-import { mcpRail } from "@/core/adapter/rails/mcp";
+import { mcpRail, mcpWalletRail } from "@/core/adapter/rails/mcp";
 import { webRail } from "@/core/adapter/rails/web";
-import type { MailerPort, PaymentPort } from "@/core/ports";
+import type {
+  ChargeOffSessionInput,
+  ChargeOffSessionResult,
+  MailerPort,
+  PaymentPort,
+} from "@/core/ports";
 import { FakeStore, makeEvent, makeTicketType } from "../helpers/fake-store";
 
 const okPayments: PaymentPort = {
@@ -265,5 +270,233 @@ describe("PurchaseCore.handleCheckoutExpired", () => {
     expect(store.ticketType.reserved).toBe(0);
     expect(await core.handleCheckoutExpired(res.order_id)).toBe(false); // no-op
     expect(store.ticketType.reserved).toBe(0);
+  });
+});
+
+/**
+ * Wallet off_session rail (design-wallet.md §3.2/§3.3, matrix §6 F).
+ * `chargeOffSession` is an OPTIONAL PaymentPort method — mocked here, ZERO real
+ * Stripe. Steps 1–5 (idempotency → catalog → spend_limit → reserve → order) are
+ * shared with hosted; only capture (step 6b) diverges. Assertions cover both the
+ * result shape AND inventory state (reserved→issued on success, released on any
+ * non-success).
+ */
+describe("PurchaseCore.run (MCP wallet rail, off_session settlement)", () => {
+  const WALLET = {
+    wallet: { customerId: "cus_test123", paymentMethodId: "pm_card_visa" },
+  } as const;
+
+  /** PaymentPort whose chargeOffSession is a spy returning a canned result. */
+  function walletPayments(
+    result: ChargeOffSessionResult | (() => Promise<ChargeOffSessionResult>),
+  ) {
+    const chargeOffSession = vi.fn(
+      async (_input: ChargeOffSessionInput): Promise<ChargeOffSessionResult> =>
+        typeof result === "function" ? await result() : result,
+    );
+    const payments: PaymentPort = {
+      // hosted must NEVER be called on the wallet path; blow up if it is.
+      createHostedCheckout: vi.fn(async () => {
+        throw new Error("hosted checkout must not run on the wallet rail");
+      }),
+      chargeOffSession,
+    };
+    return { payments, chargeOffSession };
+  }
+
+  it("succeeded: confirmed order, tickets issued INLINE, checkout_url null, ics_path set, paid:true, reserved→issued", async () => {
+    const store = new FakeStore();
+    const mailer: MailerPort = { sendTicketEmail: vi.fn(async () => {}) };
+    const { payments, chargeOffSession } = walletPayments({
+      status: "succeeded",
+      paymentIntentId: "pi_x",
+    });
+    const res = await makeCore(store, { payments, mailer }).run(
+      buyInput(),
+      mcpWalletRail,
+      WALLET,
+    );
+
+    expect(res.status).toBe("confirmed");
+    expect(res.paid).toBe(true);
+    expect(res.duplicate).toBe(false);
+    expect(res.checkout_url).toBeNull();
+    expect(res.expires_at).toBeNull();
+    expect(res.ics_path).toBe(`/r/${res.order_id}`);
+    expect(res.tickets).toHaveLength(2);
+    expect(res.tickets.every((t) => t.status === "valid")).toBe(true);
+
+    // inventory: reserved fully converted to issued (no dangling reservation).
+    expect(store.ticketType.reserved).toBe(0);
+    expect(store.ticketType.issued).toBe(2);
+    expect(store.orders.get(res.order_id)!.status).toBe("confirmed");
+    expect(store.orders.get(res.order_id)!.stripePaymentIntentId).toBe("pi_x");
+
+    // INLINE issuance reused the webhook path → reminder + email fired once.
+    expect(store.reminders).toHaveLength(1);
+    expect(mailer.sendTicketEmail).toHaveBeenCalledOnce();
+
+    expect(chargeOffSession).toHaveBeenCalledOnce();
+  });
+
+  it("declined: payment_failed with the reason, order cancelled, reserved released to 0, NO ticket issued", async () => {
+    const store = new FakeStore();
+    const { payments, chargeOffSession } = walletPayments({
+      status: "failed",
+      paymentIntentId: "pi_declined",
+      failureReason: "card_declined",
+    });
+    const err = await expectError(
+      makeCore(store, { payments }).run(buyInput(), mcpWalletRail, WALLET),
+      "payment_failed",
+    );
+    expect((err.details as { reason?: string }).reason).toBe("card_declined");
+
+    expect(chargeOffSession).toHaveBeenCalledOnce();
+    expect(store.ticketType.reserved).toBe(0); // released
+    expect(store.ticketType.issued).toBe(0); // never issued
+    const [order] = [...store.orders.values()];
+    expect(order!.status).toBe("cancelled");
+    expect(store.ticketsByOrder.size).toBe(0);
+  });
+
+  it("requires_action (3DS): payment_action_required (NOT payment_failed), order cancelled, inventory released", async () => {
+    const store = new FakeStore();
+    const { payments } = walletPayments({
+      status: "requires_action",
+      paymentIntentId: "pi_3ds",
+    });
+    const err = await expectError(
+      makeCore(store, { payments }).run(buyInput(), mcpWalletRail, WALLET),
+      "payment_action_required",
+    );
+    // distinct code from a plain decline so QA/agents can tell them apart.
+    expect(err.code).not.toBe("payment_failed");
+    expect((err.details as { paymentIntentId?: string }).paymentIntentId).toBe(
+      "pi_3ds",
+    );
+
+    expect(store.ticketType.reserved).toBe(0);
+    expect(store.ticketType.issued).toBe(0);
+    expect([...store.orders.values()][0]!.status).toBe("cancelled");
+  });
+
+  it("idempotency / double charge: retry with same key → same confirmed order, duplicate:true, chargeOffSession called ONCE with idempotencyKey = order.id", async () => {
+    const store = new FakeStore();
+    const { payments, chargeOffSession } = walletPayments({
+      status: "succeeded",
+      paymentIntentId: "pi_x",
+    });
+    const core = makeCore(store, { payments });
+
+    const first = await core.run(buyInput(), mcpWalletRail, WALLET);
+    const retry = await core.run(buyInput(), mcpWalletRail, WALLET);
+
+    // 2nd run short-circuits at findOrderByIdempotency → returns confirmed order.
+    expect(retry.order_id).toBe(first.order_id);
+    expect(retry.duplicate).toBe(true);
+    expect(retry.status).toBe("confirmed");
+    expect(store.orders.size).toBe(1);
+    expect(store.ticketType.issued).toBe(2); // not 4 — no second issuance
+
+    // ONE charge only, and its Stripe idempotency key is the stable order.id.
+    expect(chargeOffSession).toHaveBeenCalledOnce();
+    expect(chargeOffSession.mock.calls[0]![0].idempotencyKey).toBe(
+      first.order_id,
+    );
+    expect(chargeOffSession.mock.calls[0]![0].orderId).toBe(first.order_id);
+  });
+
+  it("spend_limit: total > limit → mandate_exceeded BEFORE reserving and BEFORE any charge", async () => {
+    const store = new FakeStore();
+    const { payments, chargeOffSession } = walletPayments({
+      status: "succeeded",
+      paymentIntentId: "pi_x",
+    });
+    await expectError(
+      makeCore(store, { payments }).run(
+        buyInput({ spend_limit: { amount_minor: 9_999, currency: "USD" } }),
+        mcpWalletRail,
+        WALLET,
+      ),
+      "mandate_exceeded",
+    );
+    // step 3 rejects before reserve (step 4) and before charge (step 6b).
+    expect(chargeOffSession).not.toHaveBeenCalled();
+    expect(store.ticketType.reserved).toBe(0);
+    expect(store.ticketType.issued).toBe(0);
+    expect(store.orders.size).toBe(0);
+  });
+
+  it("regression hosted: without ctx.wallet the DEFAULT hosted path runs (pending_payment + checkout_url), chargeOffSession NEVER invoked", async () => {
+    const store = new FakeStore();
+    const chargeOffSession = vi.fn(
+      async (): Promise<ChargeOffSessionResult> => ({
+        status: "succeeded",
+        paymentIntentId: "pi_x",
+      }),
+    );
+    const payments: PaymentPort = {
+      async createHostedCheckout(input) {
+        return {
+          checkoutUrl: `https://checkout.test/${input.orderId}`,
+          sessionId: `cs_${input.orderId}`,
+        };
+      },
+      chargeOffSession,
+    };
+    const res = await makeCore(store, { payments }).run(buyInput(), mcpRail);
+
+    expect(res.status).toBe("pending_payment");
+    expect(res.checkout_url).toMatch(/^https:\/\/checkout\.test\//);
+    expect(res.tickets).toHaveLength(0);
+    expect(chargeOffSession).not.toHaveBeenCalled();
+  });
+
+  it("rail selection: with ctx.wallet present, the wallet fields flow into chargeOffSession (customerId/paymentMethodId from the wallet ctx)", async () => {
+    const store = new FakeStore();
+    const { payments, chargeOffSession } = walletPayments({
+      status: "succeeded",
+      paymentIntentId: "pi_x",
+    });
+    await makeCore(store, { payments }).run(buyInput(), mcpWalletRail, {
+      wallet: { customerId: "cus_A", paymentMethodId: "pm_B" },
+    });
+
+    const charged = chargeOffSession.mock.calls[0]![0];
+    expect(charged.customerId).toBe("cus_A");
+    expect(charged.paymentMethodId).toBe("pm_B");
+    expect(charged.amountMinor).toBe(10_000);
+    expect(charged.currency).toBe("USD");
+  });
+
+  it("wallet settlement selected but ctx.wallet missing → not_implemented, inventory released, no charge attempt", async () => {
+    const store = new FakeStore();
+    const { payments, chargeOffSession } = walletPayments({
+      status: "succeeded",
+      paymentIntentId: "pi_x",
+    });
+    // wallet rail chosen but no ctx passed (edge failed to resolve the wallet).
+    await expectError(
+      makeCore(store, { payments }).run(buyInput(), mcpWalletRail),
+      "not_implemented",
+    );
+    expect(chargeOffSession).not.toHaveBeenCalled();
+    expect(store.ticketType.reserved).toBe(0); // released, never orphaned
+    expect([...store.orders.values()][0]!.status).toBe("cancelled");
+  });
+
+  it("non-card error (network/config) thrown by chargeOffSession → payment_failed, order cancelled, inventory released", async () => {
+    const store = new FakeStore();
+    const { payments } = walletPayments(async () => {
+      throw new Error("stripe network down");
+    });
+    await expectError(
+      makeCore(store, { payments }).run(buyInput(), mcpWalletRail, WALLET),
+      "payment_failed",
+    );
+    expect(store.ticketType.reserved).toBe(0);
+    expect(store.ticketType.issued).toBe(0);
+    expect([...store.orders.values()][0]!.status).toBe("cancelled");
   });
 });

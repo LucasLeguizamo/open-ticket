@@ -19,6 +19,7 @@ import {
   DEFAULT_ALARM_OFFSETS_MINUTES,
   generateIcs,
   mcpRail,
+  mcpWalletRail,
   randomId,
 } from "@/core";
 import { apiKeyRateLimited, verifyApiKeyToken } from "@/lib/api-key";
@@ -27,7 +28,7 @@ import {
   getTicketTypeDetail,
   searchEvents,
 } from "@/lib/catalog";
-import { getPurchaseCore, getStore } from "@/lib/context";
+import { getConcreteStore, getPurchaseCore, getStore } from "@/lib/context";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -105,7 +106,7 @@ const handler = createMcpHandler(
 
     server.tool(
       "buy_ticket",
-      "Buys tickets for an event while honoring the user's spend_limit. Requires an API key (Authorization: Bearer header). Returns pending_payment + checkout_url (Stripe hosted payment); check the final status with get_order. Retry with the SAME idempotency_key.",
+      "Buys tickets for an event while honoring the user's spend_limit. Requires an API key (Authorization: Bearer header). If the API key has a loaded wallet, the charge is captured off_session and the response is already confirmed (tickets[] + ics_path, paid:true). Otherwise returns pending_payment + checkout_url (Stripe hosted payment); check the final status with get_order. Retry with the SAME idempotency_key.",
       buyTicketInputSchema.shape,
       async (args, extra) =>
         run(async () => {
@@ -120,6 +121,19 @@ const handler = createMcpHandler(
             return toolError(
               "rate_limited",
               "per-minute purchase limit exceeded; retry in a moment",
+            );
+          }
+          // Resolve identity → wallet at the edge (design-wallet.md §4). The core
+          // stays framework-free: the wallet enters via ctx, never via the intent.
+          const wallet = await getConcreteStore().getWalletByApiKeyId(keyId);
+          if (wallet) {
+            return ok(
+              await getPurchaseCore().run(args, mcpWalletRail, {
+                wallet: {
+                  customerId: wallet.stripeCustomerId,
+                  paymentMethodId: wallet.stripePaymentMethodId,
+                },
+              }),
             );
           }
           return ok(await getPurchaseCore().run(args, mcpRail));

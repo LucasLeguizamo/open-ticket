@@ -18,6 +18,17 @@ export function getStore(): StorePort {
   return _store;
 }
 
+/**
+ * Concrete store for edge-only lookups that are NOT part of the framework-free
+ * StorePort — e.g. `getWalletByApiKeyId` (design-wallet.md §4). Wallet resolution
+ * is an app/auth concern (identity → payment method), not a core port, so it
+ * stays off StorePort. Returns the same singleton `getStore()` builds.
+ */
+export function getConcreteStore(): DrizzleStore {
+  if (!_store) _store = new DrizzleStore(getDb());
+  return _store as DrizzleStore;
+}
+
 export function getPurchaseCore(): PurchaseCore {
   if (!_core) {
     _core = new PurchaseCore({

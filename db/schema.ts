@@ -265,6 +265,25 @@ export const apiKey = pgTable("api_key", {
 });
 
 /**
+ * Agent wallet (design-wallet.md §1): a Stripe Customer + saved PaymentMethod
+ * (TEST off_session) bound to an api_key. One wallet per agent → api_key_id is
+ * UNIQUE and the natural lookup key. Payment concern lives here, not in api_key
+ * (auth/identity stays clean).
+ */
+export const wallet = pgTable("wallet", {
+  id: text("id").primaryKey(), // wal_...
+  apiKeyId: text("api_key_id")
+    .notNull()
+    .unique() // one wallet per agent
+    .references(() => apiKey.id),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  stripePaymentMethodId: text("stripe_payment_method_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
  * Fix P3 (webhook idempotency): the handler does INSERT ... ON CONFLICT
  * DO NOTHING with the Stripe event.id; if nothing was inserted, it was already processed.
  */

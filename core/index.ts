@@ -9,7 +9,12 @@ export {
   PurchaseCore,
   type PurchaseCoreDeps,
 } from "./adapter/purchase-core";
-export { type McpBuyTicketResponse, mcpRail } from "./adapter/rails/mcp";
+export {
+  type McpBuyTicketResponse,
+  type McpWalletBuyResponse,
+  mcpRail,
+  mcpWalletRail,
+} from "./adapter/rails/mcp";
 export {
   buyTicketInputSchema,
   moneySchema,

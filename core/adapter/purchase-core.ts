@@ -18,6 +18,7 @@ import type {
   Order,
   PurchaseIntent,
   PurchaseResult,
+  PurchaseRunContext,
   RailAdapter,
 } from "./types";
 
@@ -61,19 +62,24 @@ export class PurchaseCore {
   async run<Raw, Result>(
     raw: Raw,
     adapter: RailAdapter<Raw, Result>,
+    ctx?: PurchaseRunContext,
   ): Promise<Result> {
-    const result = await this.execute(raw, adapter);
+    const result = await this.execute(raw, adapter, ctx);
     return adapter.formatResult(result);
   }
 
   private async execute<Raw, Result>(
     raw: Raw,
     adapter: RailAdapter<Raw, Result>,
+    ctx?: PurchaseRunContext,
   ): Promise<PurchaseResult> {
-    if (adapter.settlement !== "stripe_hosted") {
+    if (
+      adapter.settlement !== "stripe_hosted" &&
+      adapter.settlement !== "wallet_off_session"
+    ) {
       throw new AgentCommerceError(
         "not_implemented",
-        `settlement "${adapter.settlement}" not implemented in v1 (stripe_hosted only)`,
+        `settlement "${adapter.settlement}" not implemented in v1 (stripe_hosted, wallet_off_session)`,
       );
     }
     if (adapter.authorization === "ap2_mandate") {
@@ -162,14 +168,28 @@ export class PurchaseCore {
       return this.toResult(order, true);
     }
 
-    // 6. Hosted checkout (Q1). On failure, release inventory — never orphan a reservation.
+    // 6. Settlement. Steps 1–5 are shared; only capture diverges (design-wallet.md §3.2).
+    const description = `${event.title} — ${ticketType.name}`;
+
+    // 6b. WALLET (settlement=wallet_off_session): off_session API charge + INLINE issuance.
+    if (adapter.settlement === "wallet_off_session") {
+      return this.settleWalletOffSession(
+        order,
+        ctx?.wallet,
+        amountMinor,
+        event.currency,
+        description,
+      );
+    }
+
+    // 6a. HOSTED checkout (Q1). On failure, release inventory — never orphan a reservation.
     try {
       const checkout = await this.payments.createHostedCheckout({
         orderId: order.id,
         currency: event.currency,
         unitAmountMinor: ticketType.priceMinor,
         quantity: intent.quantity,
-        description: `${event.title} — ${ticketType.name}`,
+        description,
         customerEmail: intent.buyer.email,
         expiresAt,
       });
@@ -186,6 +206,78 @@ export class PurchaseCore {
         { cause: err instanceof Error ? err.message : String(err) },
       );
     }
+  }
+
+  /**
+   * Wallet settlement (design-wallet.md §3.2/§3.3). The order is already
+   * pending_payment with inventory reserved; this captures off_session and,
+   * on success, issues INLINE via the SAME `handlePaymentSucceeded` as the
+   * webhook (issuance lock ⇒ no double issue). Any non-success releases the
+   * reservation — never orphans inventory.
+   */
+  private async settleWalletOffSession(
+    order: Order,
+    wallet: PurchaseRunContext["wallet"],
+    amountMinor: number,
+    currency: string,
+    description: string,
+  ): Promise<PurchaseResult> {
+    if (!this.payments.chargeOffSession || !wallet) {
+      await this.store.expireOrder(order.id, "cancelled");
+      throw new AgentCommerceError(
+        "not_implemented",
+        "wallet settlement not available",
+      );
+    }
+
+    let charge: Awaited<
+      ReturnType<NonNullable<PaymentPort["chargeOffSession"]>>
+    >;
+    try {
+      charge = await this.payments.chargeOffSession({
+        orderId: order.id,
+        customerId: wallet.customerId,
+        paymentMethodId: wallet.paymentMethodId,
+        amountMinor,
+        currency,
+        description,
+        // de-dup at Stripe level: order.id is stable across retries.
+        idempotencyKey: order.id,
+      });
+    } catch (err) {
+      // non-card errors (network/config) bubble here → release + payment_failed.
+      await this.store.expireOrder(order.id, "cancelled");
+      throw new AgentCommerceError(
+        "payment_failed",
+        "off_session charge failed",
+        { cause: err instanceof Error ? err.message : String(err) },
+      );
+    }
+
+    if (charge.status === "succeeded") {
+      // SAME atomic issuance as the webhook — issuance lock prevents double issue.
+      await this.handlePaymentSucceeded(order.id, charge.paymentIntentId);
+      const confirmed = await this.store.getOrder(order.id);
+      return this.toResult(confirmed ?? order, false);
+    }
+
+    if (charge.status === "requires_action") {
+      // No agent UI to complete 3DS in v1: cancel + release, return actionable error.
+      await this.store.expireOrder(order.id, "cancelled");
+      throw new AgentCommerceError(
+        "payment_action_required",
+        "off_session payment requires 3DS; not supported for wallet in v1",
+        { paymentIntentId: charge.paymentIntentId },
+      );
+    }
+
+    // failed / declined
+    await this.store.expireOrder(order.id, "cancelled");
+    throw new AgentCommerceError(
+      "payment_failed",
+      "card declined off_session",
+      { reason: charge.failureReason },
+    );
   }
 
   /**

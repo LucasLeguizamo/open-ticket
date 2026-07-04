@@ -25,3 +25,27 @@ export const mcpRail: RailAdapter<unknown, McpBuyTicketResponse> = {
     poll: `get_order(${result.orderId})`,
   }),
 };
+
+/**
+ * MCP wallet rail (design-wallet.md §4): same MCP channel, `wallet_off_session`
+ * settlement. The charge is captured synchronously off_session and the tickets
+ * are issued INLINE, so the response is already `confirmed` (+ tickets + ics_path)
+ * with no checkout_url and no poll. `paid: true` is the semantic marker that the
+ * charge was already captured. Reuses rail="mcp" so idempotency (rail,email,key)
+ * stays consistent even if the wallet is loaded between two retries.
+ */
+export interface McpWalletBuyResponse extends WebPurchaseResponse {
+  paid: true;
+}
+
+export const mcpWalletRail: RailAdapter<unknown, McpWalletBuyResponse> = {
+  rail: "mcp",
+  mode: "one_shot",
+  authorization: "spend_limit",
+  settlement: "wallet_off_session",
+  resolveIntent: (raw) => parseBuyTicketInput(raw, "mcp"),
+  formatResult: (result: PurchaseResult) => ({
+    ...formatPublicResult(result),
+    paid: true,
+  }),
+};

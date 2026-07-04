@@ -23,8 +23,26 @@ export type AuthorizationScheme = "none" | "spend_limit" | "ap2_mandate";
 export type SettlementScheme =
   | "stripe_hosted" // v1: hosted Checkout link + webhook (async)
   | "stripe_inline_spt" // ACP: inline Shared Payment Token on /complete (F2, not implemented)
+  | "wallet_off_session" // agent wallet: off_session API charge (TEST), synchronous issuance
   | "x402" // onchain stablecoin (later phase)
   | "mpp"; // fiat-over-402 via Stripe (stub, redundant with x402)
+
+/**
+ * Resolved wallet of the authenticated agent (settlement=wallet_off_session).
+ * Opaque to the core: resolved at the edge (lib/tool) by apiKeyId and passed
+ * through `run(..., ctx)` so `resolveIntent` stays pure (design-wallet.md §3.1).
+ */
+export interface WalletContext {
+  /** Stripe Customer id (cus_...) of the agent wallet. */
+  customerId: string;
+  /** Stripe PaymentMethod id (pm_...) saved on the wallet. */
+  paymentMethodId: string;
+}
+
+/** Opaque per-request context handed to `run()`; hosted path leaves it empty. */
+export interface PurchaseRunContext {
+  wallet?: WalletContext;
+}
 
 /** Money is ALWAYS in minor units (cents) + ISO 4217. Never floats. */
 export interface Money {

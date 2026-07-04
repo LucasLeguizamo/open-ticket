@@ -131,11 +131,45 @@ export interface HostedCheckoutInput {
   expiresAt: Date;
 }
 
+/**
+ * Off-session charge (settlement=wallet_off_session): API-only charge against a
+ * saved Stripe Customer + PaymentMethod, no browser. TEST mode only.
+ */
+export interface ChargeOffSessionInput {
+  orderId: string;
+  /** Stripe Customer id (cus_...) of the agent wallet. */
+  customerId: string;
+  /** Stripe PaymentMethod id (pm_...) saved on the wallet. */
+  paymentMethodId: string;
+  amountMinor: number;
+  currency: string;
+  description: string;
+  /** de-dup at Stripe level: the core passes order.id (stable across retries). */
+  idempotencyKey: string;
+}
+
+export interface ChargeOffSessionResult {
+  status: "succeeded" | "requires_action" | "failed";
+  /** null only when Stripe rejected before creating a PaymentIntent. */
+  paymentIntentId: string | null;
+  /** present on failed: decline_code / error code for the log/response. */
+  failureReason?: string;
+}
+
 export interface PaymentPort {
   /** v1 (settlement=stripe_hosted): creates the hosted Checkout link. */
   createHostedCheckout(
     input: HostedCheckoutInput,
   ): Promise<{ checkoutUrl: string; sessionId: string }>;
+
+  /**
+   * Agent wallet (settlement=wallet_off_session): off_session API charge, TEST.
+   * OPTIONAL: only implemented by ports that support wallets — the core checks
+   * for its presence before branching (never breaks existing PaymentPort impls).
+   */
+  chargeOffSession?(
+    input: ChargeOffSessionInput,
+  ): Promise<ChargeOffSessionResult>;
 }
 
 export interface TicketEmailInput {
