@@ -1,0 +1,67 @@
+import { Resend } from "resend";
+import type { MailerPort, TicketEmailInput } from "@/core/ports";
+
+function renderHtml(input: TicketEmailInput): string {
+  const codes = input.tickets
+    .map(
+      (t) => `<li style="font-family:monospace;font-size:16px">${t.code}</li>`,
+    )
+    .join("");
+  const amount = (input.amount.amountMinor / 100).toFixed(2);
+  const icsUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${input.icsPath}`;
+  return `<!doctype html>
+<html><body style="font-family:ui-monospace,monospace;background:#0a0a0a;color:#e5e5e5;padding:24px">
+  <h1 style="font-size:18px">&gt; openticket — orden confirmada ✓</h1>
+  <p><strong>${input.eventTitle}</strong><br/>
+  ${input.eventStartsAt.toUTCString()}${input.venue ? ` · ${input.venue}` : ""}</p>
+  <p>Tus tickets:</p>
+  <ul>${codes}</ul>
+  <p>Total: ${amount} ${input.amount.currency}</p>
+  <p>El evento va adjunto como <code>.ics</code> (con recordatorios 24h y 1h antes).<br/>
+  También: <a href="${icsUrl}" style="color:#4ade80">${icsUrl}</a></p>
+  <p style="color:#737373">orden ${input.orderId} · openticket</p>
+</body></html>`;
+}
+
+/** Fallback de desarrollo: imprime el email en consola. No bloquea la demo. */
+const consoleMailer: MailerPort = {
+  async sendTicketEmail(input) {
+    console.log(
+      [
+        "─".repeat(60),
+        `[mailer:console] Ticket email → ${input.to}`,
+        `  evento : ${input.eventTitle} @ ${input.eventStartsAt.toISOString()}`,
+        `  tickets: ${input.tickets.map((t) => t.code).join(", ")}`,
+        `  total  : ${input.amount.amountMinor} ${input.amount.currency} (minor)`,
+        `  .ics   : ${input.icsPath} (${input.icsContent.length} bytes)`,
+        "─".repeat(60),
+      ].join("\n"),
+    );
+  },
+};
+
+/** MailerPort real (Resend) si hay RESEND_API_KEY; si no, consola. */
+export function createMailer(): MailerPort {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return consoleMailer;
+  const resend = new Resend(key);
+  const from = process.env.EMAIL_FROM ?? "OpenTicket <onboarding@resend.dev>";
+  return {
+    async sendTicketEmail(input) {
+      const { error } = await resend.emails.send({
+        from,
+        to: input.to,
+        subject: `Tu ticket: ${input.eventTitle}`,
+        html: renderHtml(input),
+        attachments: [
+          {
+            filename: "event.ics",
+            content: Buffer.from(input.icsContent, "utf8").toString("base64"),
+            contentType: "text/calendar",
+          },
+        ],
+      });
+      if (error) throw new Error(`Resend: ${error.message}`);
+    },
+  };
+}

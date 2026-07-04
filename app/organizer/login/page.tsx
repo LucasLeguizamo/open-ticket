@@ -1,0 +1,103 @@
+/** Login / registro de organizadores — email + contraseña (FR 11). */
+import { Suspense } from "react";
+import { login, signup } from "../actions";
+
+const ERRORS: Record<string, string> = {
+  credenciales: "email o contraseña incorrectos",
+  email_ya_registrado: "ese email ya tiene cuenta",
+  datos_invalidos: "revisa email (válido) y contraseña (mínimo 8 caracteres)",
+};
+
+const inputCls =
+  "w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-200";
+
+async function LoginForms({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  return (
+    <>
+      {error && (
+        <p className="rounded border border-red-900 bg-red-950 p-2 text-red-400">
+          error: {ERRORS[error] ?? error}
+        </p>
+      )}
+      <section className="space-y-2">
+        <p className="text-neutral-500"># ya tengo cuenta</p>
+        <form action={login} className="space-y-2">
+          <input
+            className={inputCls}
+            name="email"
+            type="email"
+            placeholder="email"
+            required
+          />
+          <input
+            className={inputCls}
+            name="password"
+            type="password"
+            placeholder="contraseña"
+            minLength={8}
+            required
+          />
+          <button
+            className="rounded bg-green-600 px-4 py-2 font-bold text-black"
+            type="submit"
+          >
+            login →
+          </button>
+        </form>
+      </section>
+      <section className="space-y-2">
+        <p className="text-neutral-500"># crear cuenta de organizador</p>
+        <form action={signup} className="space-y-2">
+          <input
+            className={inputCls}
+            name="name"
+            placeholder="nombre / organización"
+            minLength={2}
+            required
+          />
+          <input
+            className={inputCls}
+            name="email"
+            type="email"
+            placeholder="email"
+            required
+          />
+          <input
+            className={inputCls}
+            name="password"
+            type="password"
+            placeholder="contraseña (mín. 8)"
+            minLength={8}
+            required
+          />
+          <button
+            className="rounded border border-green-600 px-4 py-2 text-green-500"
+            type="submit"
+          >
+            signup →
+          </button>
+        </form>
+      </section>
+    </>
+  );
+}
+
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  return (
+    <main className="mx-auto max-w-sm space-y-8 p-8 text-sm">
+      <p className="text-neutral-500">$ openticket organizer --auth</p>
+      <Suspense fallback={null}>
+        <LoginForms searchParams={searchParams} />
+      </Suspense>
+    </main>
+  );
+}

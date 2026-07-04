@@ -1,0 +1,49 @@
+{
+  "name": "open-ticket",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenTicket — agent-native ticketing. Core de compra (AgentCommerceAdapter) framework-free, extraíble como paquete.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts",
+    "test": "vitest run test/unit",
+    "test:watch": "vitest test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:all": "vitest run",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "agent:race": "tsx scripts/buyer-agent.ts",
+    "harness": "bash scripts/harness.sh",
+    "build:check": "NEXT_DIST_DIR=.next-build next build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "drizzle-orm": "^0.44.2",
+    "mcp-handler": "^1.1.0",
+    "next": "^16.0.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "resend": "^4.6.0",
+    "stripe": "^18.4.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@tailwindcss/postcss": "^4.1.11",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.4",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "dotenv": "^17.2.0",
+    "drizzle-kit": "^0.31.4",
+    "tailwindcss": "^4.1.11",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
