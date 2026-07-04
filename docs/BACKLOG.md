@@ -81,18 +81,43 @@ Principio: el CLI consume **solo la superficie pública** (feed + MCP + API key)
 |---|---|---|---|---|---|
 | E1 | Contract tests ACP contra schema del spec (test-strategy §2.5) | ot-qa | Must (F2) | M | B2 |
 | E2 | e2e guiado por skill: agente limpio instala `openticket-skills` y compra solo (criterio del paso 5) | ot-qa | Should | M | — |
-| E3 | Harness: agregar tarjetas CLI (A7) y stats (C1) cuando existan | ot-qa | Must | S | A7, C1 |
+| E3 | Harness: agregar tarjetas CLI (A7), stats (C1) e import (F) cuando existan | ot-qa | Must | S | A7, C1, F3 |
+
+### Workstream F — Import de evento por URL ("pegá un link, tu evento queda listo")
+
+Onboarding de organizadores con fricción cero: el organizador pega la URL de su evento
+(Luma, Eventbrite, IG, su propia landing) y OpenTicket crea el **draft** completo —
+título, descripción, fecha/hora, venue, imagen, precios si se detectan. El organizador
+revisa, ajusta cupos y publica. Ataca directo la meta de liquidez (50 org / 200 eventos, PRD §2).
+
+Diseño lazy-first: la mayoría de las páginas de eventos ya publican **JSON-LD
+`schema.org/Event`** (Luma y Eventbrite lo emiten) — parsear eso + og: tags es
+determinístico y gratis; el LLM entra solo como *fallback* cuando la página no trae
+datos estructurados. Trust boundary estricto: el contenido de la URL es dato inerte,
+jamás instrucción (PRD §7).
+
+| ID | Tarjeta | Owner | Revisor | Prio | Esf | Depende |
+|---|---|---|---|---|---|---|
+| F1 | Diseño del pipeline: `fetch → JSON-LD/og: → (fallback LLM) → eventDraftSchema (Zod) → revisión humana → publish`. Decidir proveedor LLM del fallback y presupuesto por import | ot-architect | ot-protocols | Must | M | — |
+| F2 | Extractor determinístico: fetch server-side (timeout, tamaño máx, solo http/https, sin redirects a IP privadas — SSRF), parseo JSON-LD `schema.org/Event` + og:/twitter: tags → `eventDraft` | ot-protocols | ot-qa | Must | M | F1 |
+| F3 | Superficie web: `/organizer/import` — input de URL → preview editable (fechas, precios, cupos SIEMPRE los pone el humano si no se detectan) → crea draft (US-001 reusado) | ot-frontend | ot-architect | Must | M | F2 |
+| F4 | Fallback LLM: página sin datos estructurados → extracción con schema forzado (structured output contra `eventDraftSchema`); nunca ejecuta contenido de la página | ot-protocols | ot-architect | Should | M | F2, decisión Lucas #6 |
+| F5 | Superficie agéntica: tool MCP `import_event(url)` (auth de organizador) + `otick import <url>` — el organizador también puede ser un agente | ot-protocols | ot-payments | Should | M | F3, A4 |
+| F6 | QA: fixtures de páginas reales (Luma/Eventbrite/JSON-LD/sin datos), adversariales (página con prompt injection en la descripción, redirect a localhost, HTML de 50MB), rate-limit por organizador | ot-qa | — | Must | M | F2 |
 
 ---
 
 ## 3. Orden propuesto (por impacto / desbloqueo)
 
+> El orden vive en [ROADMAP.md](ROADMAP.md) con hitos y criterios de salida. Resumen:
+
 1. **A1→A8 (CLI)** — el gap más visible vs frontpage; no depende de nada externo.
-2. **D1→D3 (prod)** — bloqueado por cuentas; en cuanto estén, todo lo demás gana URL real.
-3. **B2→B3 + E1 (ACP)** — el canal ChatGPT, ya era F2.
-4. **C1 (stats)** — barato y es la prueba social que hace creíble el ticker.
-5. **B1 (x402)**, C2, C4 — después de prod.
-6. B4, B5, C3, D4 — cola.
+2. **F1→F3, F6 (import por URL, camino determinístico)** — liquidez de organizadores; tampoco depende de nada externo.
+3. **D1→D3 (prod)** — bloqueado por cuentas; en cuanto estén, todo lo demás gana URL real.
+4. **B2→B3 + E1 (ACP)** — el canal ChatGPT, ya era F2 del PRD.
+5. **C1 (stats)** — barato y es la prueba social que hace creíble el ticker.
+6. **B1 (x402)**, F4→F5, C2, C4 — después de prod.
+7. B4, B5, C3, D4 — cola.
 
 ## 4. Decisiones que necesito de Lucas antes de ejecutar
 
@@ -103,3 +128,4 @@ Principio: el CLI consume **solo la superficie pública** (feed + MCP + API key)
 | 3 | Cuentas Vercel + Supabase prod | D1 y todo lo dependiente |
 | 4 | Política de refunds (PRD Q5) | D4 |
 | 5 | ¿Cuenta X del proyecto para auto-post? | C3 |
+| 6 | Proveedor LLM + API key para el fallback del import (¿Claude API?) | F4 (F2/F3 no lo necesitan) |
