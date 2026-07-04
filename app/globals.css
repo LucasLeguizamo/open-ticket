@@ -2,9 +2,117 @@
 
 :root {
   color-scheme: dark;
+
+  /* Arcade 8-bit palette — NES-ish neon on black */
+  --pg-bg: #0a0a0f;
+  --pg-panel: #12121c;
+  --pg-ink: #e8e8f0;
+  --pg-dim: #8a8aaa;
+  --pg-green: #3df58b;
+  --pg-magenta: #ff4fa3;
+  --pg-cyan: #4fe3ff;
+  --pg-yellow: #ffd23f;
+  --pg-red: #ff5a5a;
+  --pg-line: #2a2a3a;
+  --pg-ink-dark: #05120a;
 }
 
 body {
-  background: #0a0a0a;
-  color: #e5e5e5;
+  background: var(--pg-bg);
+  color: var(--pg-ink);
+}
+
+/* Pixel font on titles; monospace stays on body (set in layout). */
+.font-pixel {
+  font-family: var(--font-pixel), "Courier New", monospace;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+/* Chunky pixel frame: square corners + hard offset shadow. */
+.pixel-box {
+  background: var(--pg-panel);
+  border: 3px solid var(--pg-line);
+  box-shadow: 6px 6px 0 0 rgba(0, 0, 0, 0.6);
+  border-radius: 0;
+}
+.pixel-box--green {
+  border-color: var(--pg-green);
+}
+.pixel-box--magenta {
+  border-color: var(--pg-magenta);
+}
+.pixel-box--cyan {
+  border-color: var(--pg-cyan);
+}
+
+/* Arcade button: hard edges, coin-op feel, presses down on click. */
+.pixel-btn {
+  font-family: var(--font-pixel), monospace;
+  display: inline-block;
+  text-transform: uppercase;
+  background: var(--pg-green);
+  color: var(--pg-ink-dark);
+  border: 3px solid var(--pg-ink-dark);
+  border-radius: 0;
+  padding: 0.7rem 1rem;
+  box-shadow: 4px 4px 0 0 #000;
+  cursor: pointer;
+  transition:
+    filter 0.05s,
+    transform 0.05s,
+    box-shadow 0.05s;
+  text-decoration: none;
+}
+.pixel-btn:hover {
+  filter: brightness(1.12);
+}
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 0 #000;
+}
+.pixel-btn--magenta {
+  background: var(--pg-magenta);
+}
+.pixel-btn--ghost {
+  background: transparent;
+  color: var(--pg-cyan);
+  border-color: var(--pg-cyan);
+  box-shadow: 4px 4px 0 0 rgba(79, 227, 255, 0.25);
+}
+
+/* Blinking "INSERT COIN" / cursor. */
+@keyframes pg-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.pg-blink {
+  animation: pg-blink 1s steps(1) infinite;
+}
+
+/* Subtle CRT scanlines over everything. */
+.pg-scanlines::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.18) 0,
+    rgba(0, 0, 0, 0.18) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Keep sprites crisp when scaled. */
+.pixelated {
+  image-rendering: pixelated;
 }

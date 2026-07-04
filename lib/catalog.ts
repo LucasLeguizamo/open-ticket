@@ -24,6 +24,7 @@ export interface EventSummary {
   description: string;
   slug: string;
   venue: string | null;
+  image_url: string | null;
   starts_at: string;
   timezone: string;
   currency: string;
@@ -91,6 +92,7 @@ export async function searchEvents(
     description: e.description,
     slug: e.slug,
     venue: e.venue,
+    image_url: e.imageUrl,
     starts_at: e.startsAt.toISOString(),
     timezone: e.timezone,
     currency: e.currency,

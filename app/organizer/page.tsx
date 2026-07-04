@@ -124,6 +124,12 @@ async function Dashboard({
             import from URL →
           </a>
         </p>
+        <p className="text-neutral-600">
+          New here?{" "}
+          <a className="underline hover:text-green-500" href="/organizer/guide">
+            read the upload guide →
+          </a>
+        </p>
       </section>
 
       <section className="space-y-2">

@@ -1,46 +1,34 @@
 /**
- * /agents page (README step 1) — the showcase for agents and devs. CLI
- * aesthetic like the landing. Documents the MCP server, the 4 tools with
- * example payloads, and the discovery endpoints (JSON feed, llms.txt, OpenAPI).
- *
- * URLs use the real request host (headers()) → correct in preview and prod.
+ * /agents — the showcase for agents and devs (arcade-skinned like the landing).
+ * MCP server, tools, the autonomous wallet purchase, a copy-paste prompt to hand
+ * another agent, and the discovery endpoints. URLs use the real request host.
  */
 import { headers } from "next/headers";
 import { Suspense } from "react";
+import { SiteFooter } from "../site-footer";
+import { CopyBlock } from "./copy-block";
+
+// Public demo key from the seed — buy-scoped, Stripe test mode, wallet loaded.
+const DEMO_KEY = "ot_live_demo_key_solo_para_test";
 
 export const metadata = {
   title: "OpenTicket · for agents",
-  description: "OpenTicket's MCP server, events feed, and public endpoints.",
+  description:
+    "OpenTicket's MCP server, autonomous wallet purchase, and endpoints.",
 };
 
-const TOOLS: { name: string; desc: string; payload: object }[] = [
+const TOOLS: { name: string; desc: string }[] = [
   {
     name: "search_events",
-    desc: "Searches published events and their ticket types (price + availability).",
-    payload: { query: "jazz", limit: 20 },
+    desc: "published events + ticket types (price, availability)",
   },
-  {
-    name: "get_ticket",
-    desc: "Details of a ticket type before buying.",
-    payload: { ticket_type_id: "tt_..." },
-  },
+  { name: "get_ticket", desc: "details of a ticket type before buying" },
   {
     name: "buy_ticket",
-    desc: "Buys while honoring spend_limit. Returns pending_payment + checkout_url.",
-    payload: {
-      event_id: "evt_...",
-      ticket_type_id: "tt_...",
-      quantity: 1,
-      buyer_email: "user@example.com",
-      idempotency_key: "generated-by-you-reuse-on-retries",
-      spend_limit: { amount_minor: 50000, currency: "USD" },
-    },
+    desc: "buys within spend_limit; wallet → confirmed, else checkout_url",
   },
-  {
-    name: "set_reminder",
-    desc: "Schedules an email reminder + returns an .ics with alarms (24h/1h).",
-    payload: { event_id: "evt_...", buyer_email: "user@example.com" },
-  },
+  { name: "get_order", desc: "final status of an order" },
+  { name: "set_reminder", desc: "email reminder + .ics with alarms" },
 ];
 
 async function AgentContent() {
@@ -51,9 +39,27 @@ async function AgentContent() {
 
   const mcpConfig = `{
   "mcpServers": {
-    "openticket": { "url": "${origin}/api/mcp" }
+    "openticket": {
+      "url": "${origin}/api/mcp",
+      "headers": { "Authorization": "Bearer ${DEMO_KEY}" }
+    }
   }
 }`;
+
+  const agentPrompt = `You have the OpenTicket MCP tools connected. Emulate a real purchase:
+1. Call search_events and pick one event with an available ticket type.
+2. Call buy_ticket with quantity 1, buyer_email "agent@test.com", a fresh
+   idempotency_key, and spend_limit { amount_minor: 5000, currency: "USD" }.
+3. Show me the result: status, order_id, the ticket code and the ics_path.
+This demo key has a wallet loaded, so buy_ticket pays autonomously and returns
+status "confirmed" (paid: true) instantly — no browser, no checkout page.`;
+
+  const terminalRecipe = `# one-time: point otick at OpenTicket and paste the demo key
+export OPENTICKET_BASE_URL=${origin}
+echo ${DEMO_KEY} | otick login
+# emulate a purchase (wallet → confirmed instantly, no browser)
+otick events                                 # grab a ticket_type id (tt_...)
+otick buy <tt_id> --limit 50USD --email agent@test.com`;
 
   const links: [string, string][] = [
     ["Events feed (JSON)", "/api/events"],
@@ -65,66 +71,82 @@ async function AgentContent() {
   return (
     <>
       <section className="space-y-2">
-        <p className="text-neutral-500">
-          # 0. or install the skills — your agent learns the whole flow
+        <p className="font-pixel text-[0.6rem] text-[var(--pg-green)]">
+          # 0. install the skills — your agent learns the whole flow
         </p>
-        <pre className="overflow-x-auto rounded border border-neutral-800 bg-neutral-950 p-4 text-green-400">
-          npx skills add LucasLeguizamo/openticket-skills --copy
-        </pre>
-        <p className="text-neutral-600">
-          search + buy, spend limits, idempotent retries —{" "}
-          <a
-            className="underline hover:text-green-500"
-            href="https://github.com/LucasLeguizamo/openticket-skills"
-          >
-            openticket-skills
-          </a>
-        </p>
+        <CopyBlock text="npx skills add LucasLeguizamo/openticket-skills --copy" />
       </section>
 
       <section className="space-y-2">
-        <p className="text-neutral-500">
-          # 1. connect your agent (Claude, etc.)
+        <p className="font-pixel text-[0.6rem] text-[var(--pg-cyan)]">
+          # 1. connect your agent (Claude Desktop, etc.)
         </p>
-        <pre className="overflow-x-auto rounded border border-neutral-800 bg-neutral-950 p-4 text-green-400">
-          {mcpConfig}
-        </pre>
-        <p className="text-neutral-600">
+        <CopyBlock text={mcpConfig} variant="cyan" />
+        <p className="text-xs text-[var(--pg-dim)]">
           MCP server (streamable HTTP): {origin}/api/mcp
         </p>
       </section>
 
       <section className="space-y-3">
-        <p className="text-neutral-500"># 2. available tools</p>
-        {TOOLS.map((t) => (
-          <div
-            key={t.name}
-            className="space-y-1 rounded border border-neutral-800 p-3"
-          >
-            <p>
-              <strong className="text-green-500">{t.name}</strong>{" "}
-              <span className="text-neutral-500">— {t.desc}</span>
-            </p>
-            <pre className="overflow-x-auto text-neutral-400">
-              {JSON.stringify(t.payload, null, 2)}
-            </pre>
-          </div>
-        ))}
-        <p className="text-neutral-600">
-          Structured errors: sold_out · mandate_exceeded · invalid_intent. Retry
-          with the SAME idempotency_key. Final status: get_order.
+        <p className="font-pixel text-[0.6rem] text-[var(--pg-magenta)]">
+          # 2. tools
         </p>
+        <ul className="space-y-1 text-xs">
+          {TOOLS.map((t) => (
+            <li key={t.name}>
+              <span className="text-[var(--pg-green)]">▸ {t.name}</span>{" "}
+              <span className="text-[var(--pg-dim)]">— {t.desc}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="space-y-2">
-        <p className="text-neutral-500"># 3. discovery without MCP</p>
-        <ul className="space-y-1">
+        <p className="font-pixel text-[0.6rem] text-[var(--pg-yellow)]">
+          # 3. autonomous purchase (agent wallet)
+        </p>
+        <p className="text-xs leading-relaxed text-[var(--pg-dim)]">
+          An agent whose API key has a{" "}
+          <span className="text-[var(--pg-green)]">wallet</span> loaded pays{" "}
+          <span className="text-[var(--pg-green)]">off_session</span> — no
+          browser, no checkout page. buy_ticket charges the wallet and issues
+          the ticket in the same response:{" "}
+          <span className="text-[var(--pg-green)]">
+            status: confirmed · paid: true
+          </span>
+          . Without a wallet it falls back to hosted Stripe Checkout
+          (pending_payment + checkout_url). Spend limits, idempotent retries and
+          structured errors (sold_out · mandate_exceeded · payment_failed) apply
+          either way.
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <p className="font-pixel text-[0.6rem] text-[var(--pg-green)]">
+          # 4. emulate a purchase — hand this to any agent
+        </p>
+        <p className="text-xs text-[var(--pg-dim)]">
+          Connect the server (step 1), then paste this prompt to your agent:
+        </p>
+        <CopyBlock text={agentPrompt} />
+        <p className="text-xs text-[var(--pg-dim)]">Or from a terminal:</p>
+        <CopyBlock text={terminalRecipe} variant="cyan" />
+      </section>
+
+      <section className="space-y-2">
+        <p className="font-pixel text-[0.6rem] text-[var(--pg-cyan)]">
+          # 5. discovery without MCP
+        </p>
+        <ul className="space-y-1 text-xs">
           {links.map(([label, href]) => (
             <li key={href}>
-              <a className="underline hover:text-green-500" href={href}>
+              <a
+                className="text-[var(--pg-dim)] underline hover:text-[var(--pg-green)]"
+                href={href}
+              >
                 {label}
               </a>{" "}
-              <span className="text-neutral-600">
+              <span className="text-[var(--pg-line)]">
                 {origin}
                 {href}
               </span>
@@ -138,33 +160,37 @@ async function AgentContent() {
 
 export default function AgentsPage() {
   return (
-    <main className="mx-auto max-w-3xl space-y-10 p-8 text-sm">
-      <nav className="flex justify-between text-neutral-500">
-        <a className="underline hover:text-green-500" href="/">
+    <main className="mx-auto max-w-3xl space-y-8 p-6 sm:p-8">
+      <nav className="flex justify-between text-xs text-[var(--pg-dim)]">
+        <a className="underline hover:text-[var(--pg-green)]" href="/">
           ← openticket
         </a>
-        <span>/agents</span>
+        <span className="font-pixel text-[0.55rem]">/agents</span>
       </nav>
 
       <header className="space-y-3">
-        <p className="text-neutral-500">$ openticket agents --help</p>
-        <h1 className="text-2xl font-bold">
-          Buy tickets programmatically.
-          <span className="animate-pulse">▌</span>
+        <p className="text-xs text-[var(--pg-dim)]">
+          $ openticket agents --help
+        </p>
+        <h1 className="font-pixel text-base leading-relaxed text-[var(--pg-ink)] sm:text-lg">
+          Buy tickets programmatically
+          <span className="pg-blink text-[var(--pg-green)]">_</span>
         </h1>
-        <p className="text-neutral-400">
-          Every ticket is discoverable and buyable by an agent. Connect via{" "}
-          <span className="text-green-500">MCP</span> or consume the JSON feed.
+        <p className="text-sm text-[var(--pg-dim)]">
+          Every ticket is discoverable and buyable by an agent — via{" "}
+          <span className="text-[var(--pg-green)]">MCP</span>, paid from an
+          agent <span className="text-[var(--pg-green)]">wallet</span> or hosted
+          Stripe Checkout.
         </p>
       </header>
 
-      <Suspense fallback={<p className="text-neutral-600">$ loading…</p>}>
+      <Suspense fallback={<p className="text-[var(--pg-dim)]">$ loading…</p>}>
         <AgentContent />
       </Suspense>
 
-      <footer className="text-neutral-600">
-        openticket v0.1 · rails: mcp ✓ · web ✓ · acp/x402/ap2 ⧗
-      </footer>
+      <Suspense fallback={<p className="text-[var(--pg-dim)]">$ loading…</p>}>
+        <SiteFooter />
+      </Suspense>
     </main>
   );
 }

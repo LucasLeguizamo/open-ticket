@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
+import { Press_Start_2P } from "next/font/google";
 import "./globals.css";
+
+// Pixel font for arcade-style titles; body stays monospace (agent-native DNA).
+const pixel = Press_Start_2P({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-pixel",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "OpenTicket — agent-native ticketing",
@@ -14,7 +23,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen font-mono antialiased">{children}</body>
+      <body
+        className={`${pixel.variable} pg-scanlines min-h-screen font-mono antialiased`}
+      >
+        {children}
+      </body>
     </html>
   );
 }
