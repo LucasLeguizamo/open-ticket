@@ -7,7 +7,7 @@
   "packageManager": "pnpm@10.33.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Lucas-FullStackX/open-ticket.git"
+    "url": "https://github.com/LucasLeguizamo/open-ticket.git"
   },
   "scripts": {
     "dev": "next dev",
