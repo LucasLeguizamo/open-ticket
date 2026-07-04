@@ -4,6 +4,7 @@ node_modules/
 # next
 .next/
 .next-build/
+.next-preview/
 out/
 next-env.d.ts
 

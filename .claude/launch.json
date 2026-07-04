@@ -7,6 +7,13 @@
       "runtimeArgs": ["dev"],
       "port": 3000,
       "autoPort": false
+    },
+    {
+      "name": "next-dev-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev:preview"],
+      "port": 3007,
+      "autoPort": true
     }
   ]
 }

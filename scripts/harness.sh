@@ -114,6 +114,41 @@ else
     -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"buy_ticket","arguments":{"event_id":"evt_x","ticket_type_id":"tt_x","quantity":1,"buyer_email":"a@t.co","idempotency_key":"harness-noauth","spend_limit":{"amount_minor":1,"currency":"COP"}}}}' \
     "$BASE/api/mcp"
 
+  # 6a. otick CLI (A6/A7) — dogfoods the public surface from the sibling repo.
+  # Deterministic: `otick events --json` hits GET /api/events (no auth, no Stripe)
+  # against this same harness server, expecting exit 0 + an "events" array. Runs
+  # ONLY when the CLI binary is built at ../otick; otherwise BLOCKED (a missing
+  # sibling checkout is not a bug in THIS repo). The CLI is pointed at $BASE via
+  # OPENTICKET_BASE_URL (env override; see otick src/config.ts).
+  OTICK_BIN="../otick/dist/bin.js"
+  if [ -f "$OTICK_BIN" ]; then
+    echo "▸ cli:otick events"
+    if OTICK_OUT=$(OPENTICKET_BASE_URL="$BASE" node "$OTICK_BIN" events --json 2>&1) \
+       && echo "$OTICK_OUT" | grep -q '"events"'; then
+      report PASS "cli:otick"
+    else
+      report FAIL "cli:otick" "$(echo "$OTICK_OUT" | tail -3 | tr '\n' ' · ')"
+    fi
+  else
+    report BLOCKED "cli:otick" "sibling CLI not built — run \`npm run build\` in ../otick to enable this check"
+  fi
+
+  # 6b. URL import (F6/E3) — PROPOSED, not wired.
+  # The deterministic import path is fully covered by `pnpm test` above
+  # (test/unit/import-{extract,fetch,fixtures,orchestrator}.test.ts), so the
+  # harness already guards it via the unit stage. A LIVE end-to-end check would
+  # need three things this harness can't give deterministically:
+  #   1. the organizer server action /organizer/import is auth-gated
+  #      (requireOrganizer) — no session cookie in a curl-only harness;
+  #   2. a real reachable external URL emitting schema.org/Event JSON-LD —
+  #      network-dependent, would flake CI when the third party is down;
+  #   3. safeFetchHtml refuses loopback, so we can't self-host the fixture and
+  #      point the import at it (that's the SSRF guard working as intended).
+  # When F3's preview + a test-organizer session land, wire it as e.g.:
+  #   expect "import luma draft" 200 '"coverage"' -X POST "${ORG_HDR[@]}" \
+  #     -d '{"url":"https://lu.ma/<known-fixture-event>"}' "$BASE/organizer/import"
+  # Until then: leave OUT of the live run rather than add a flaky check.
+
   # 7. Agent race (F1.5) against the harness server
   echo "▸ agent:race"
   RACE_OUT=$(MCP_URL="$BASE/api/mcp" AGENTS=3 pnpm agent:race 2>&1)

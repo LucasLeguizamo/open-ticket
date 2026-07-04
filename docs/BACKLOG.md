@@ -1,8 +1,24 @@
 # Backlog — alcance hacia el nivel frontpage.sh
 
-**Status:** Propuesta para aprobar (no ejecutar sin OK)
-**Fecha:** 2026-07-04
+**Status:** En ejecución (2026-07-04)
 **Fuente:** análisis en vivo de frontpage.sh + PRD §12. Norte: *el agente es el usuario primario*.
+
+---
+
+## Estado de ejecución (2026-07-04)
+
+| Tarjeta | Estado |
+|---|---|
+| A1 diseño CLI | ✅ `docs/design-cli.md` |
+| A2 events/search · A3 login/whoami · A4 buy --wait · A5 --json/exit codes | ✅ (repo `~/Documents/CONCAT/otick`, verificado en vivo) |
+| A6 watch SSE · A7 tests/harness | ✅ (31 tests + card `cli:otick` verde en el harness) |
+| A8 publish npm | ⛔ gated (reservar nombre `otick` + OK Lucas + auth GitHub) |
+| F1 diseño import | ✅ `docs/design-import.md` |
+| F2 extractor + fetch SSRF · F3 web import · F6 QA | ✅ (verificado en browser + tests) |
+| F4 fallback LLM · F5 import agéntico | → M5 |
+| D1 deploy prod | ⏸️ discovery hecho; gated por cuentas (reconectar MCPs) |
+| D2 cron · D3 skills→prod · D4 refunds | ⏳ post-D1 |
+| B*, C*, E1/E2 | ⏳ backlog (M4-M6) |
 
 ---
 

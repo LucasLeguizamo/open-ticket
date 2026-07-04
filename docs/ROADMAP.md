@@ -1,6 +1,6 @@
 # Roadmap — OpenTicket
 
-**Status:** Propuesta para aprobar
+**Status:** En ejecución — M1 casi completo (falta A8/publish), M2 ✅ completo, M3 bloqueado por cuentas
 **Fecha:** 2026-07-04
 **Tarjetas y owners:** [BACKLOG.md](BACKLOG.md) · Fases de producto originales: [PRD §12](../PRD.md)
 
@@ -26,27 +26,33 @@ Core de compra framework-free, MCP server (5 tools), web mínima CLI-style, skil
 instalables (`npx skills add LucasLeguizamo/openticket-skills`), feed JSON, llms.txt,
 OpenAPI, API keys, harness de automejora, CI verde, repo open source (MIT).
 
-## M1 — CLI `otick` *(workstream A · sin dependencias externas)*
+## M1 — CLI `otick` 🟢 casi completo (A1-A7 hechos, falta A8/publish) *(workstream A)*
 
-La terminal como tercera superficie de compra (skills ✓, MCP ✓, CLI ✗ → ✓).
+La terminal como tercera superficie de compra (skills ✓, MCP ✓, CLI ✓).
 
-- Tarjetas: A1→A8 (+E3 harness).
-- **Salida:** `npm i -g <cli>` en una máquina limpia → `otick search jazz`,
-  `otick buy tt_… --limit 50USD --wait` termina en ticket confirmado + .ics;
-  `--json` + exit codes estables; tarjeta CLI verde en el harness.
-- **Bloqueado por:** decisiones #1 (nombre/ubicación) y #2 (scope npm).
+- Tarjetas: A1 ✅, A2 ✅, A3 ✅, A4 ✅, A5 ✅, A6 ✅, A7 ✅. **A8 (publish) ⛔ gated.**
+- **Entregado:** repo aparte `~/Documents/CONCAT/otick` (commit local `2c8a3df`). `events`/`search`
+  (REST), `login`/`whoami` (config `~/.config/otick`, 0600), `buy --limit --wait` (MCP JSON-RPC +
+  poll + baja el .ics de `/r/<id>`), `watch` (SSE con reconnect), `--json` + exit codes anclados a
+  `AgentCommerceErrorCode`. Deps runtime: solo `zod`. 4 archivos vendorizados de `core/` con drift
+  guard. 31 tests + card `cli:otick` en el harness (verde).
+- **Falta A8:** reservar nombre npm `otick`, `npm publish` (login de Lucas), anunciar en
+  `llms.txt`/`/agents`/skills. Ver `docs/design-cli.md §8`.
 
-## M2 — Import de evento por URL *(workstream F, camino determinístico)*
+## M2 — Import de evento por URL ✅ (hecho, 2026-07-04) *(workstream F, camino determinístico)*
 
 **La tool que pediste:** el organizador pega la URL de su evento y sale un draft listo
 para publicar. Primero JSON-LD/og: (gratis, determinístico, cubre Luma/Eventbrite);
 el fallback LLM queda para M5.
 
-- Tarjetas: F1, F2, F3, F6.
-- **Salida:** pegar una URL real de Luma en `/organizer/import` → preview con título,
-  fecha, venue e imagen correctos → publicar → el evento aparece en `/api/events` y es
-  comprable por MCP. Adversariales de F6 en verde.
-- **Bloqueado por:** nada. Corre en paralelo con M1 (workstreams disjuntos).
+- Tarjetas: F1 ✅, F2 ✅, F3 ✅, F6 ✅. (F4/F5 → M5.)
+- **Entregado:** `lib/zod/event.ts` (def canónica reusada por `createEvent`), `lib/import/*`
+  (fetch SSRF-safe con `node:http/https` + hook `lookup` que valida la IP del socket —
+  cierra TOCTOU sin deps; extractor JSON-LD/og:; normalize donde el cupo JAMÁS se importa),
+  web `/organizer/import` con preview editable + rate-limit por organizer, y tests
+  (fixtures Luma/Eventbrite/og/empty + adversariales injection/SSRF/JSON-LD hostil).
+  Verificado en browser: SSRF guard + mapeo de `FetchError` a UI en runtime real.
+- **Bloqueado por:** nada.
 
 ## M3 — Producción *(workstream D)*
 
@@ -100,9 +106,9 @@ La lección MPP de frontpage: *el pago es la identidad* — un agente compra sin
 
 | # | Decisión | Hito que destraba | Estado |
 |---|---|---|---|
-| 1 | Nombre CLI (`otick` propuesto) + repo aparte vs `packages/cli` | M1 | ⏳ |
-| 2 | Scope npm (`@openticket/cli` requiere org) | M1 (A8) | ⏳ |
-| 3 | Cuentas Vercel + Supabase prod | M3 → M4-M6 | ⏳ |
+| 1 | Nombre CLI + ubicación | M1 | ✅ `otick`, repo aparte (`docs/design-cli.md`) |
+| 2 | Distribución npm | M1 (A8) | ✅ nombre plano `otick`, sin scope. Falta reservar nombre + OK publish |
+| 3 | Cuentas Vercel + Supabase prod | M3 → M4-M6 | ⏳ Lucas dice listas — falta reconectar MCPs / dar slug+ref |
 | 4 | Política de refunds (PRD Q5) | M6 (D4) | ⏳ |
 | 5 | Cuenta X para auto-post | M6 (C3) | ⏳ |
-| 6 | Proveedor LLM del fallback de import | M5 (F4) | ⏳ |
+| 6 | Proveedor LLM del fallback de import | M5 (F4) | ✅ Claude Haiku via AI Gateway, flag off (`docs/design-import.md`) |
