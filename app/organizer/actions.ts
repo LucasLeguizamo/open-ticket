@@ -24,8 +24,17 @@ const credentialsSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
-function loginError(code: string): never {
-  redirect(`/organizer/login?error=${code}`);
+/** Only same-site organizer paths are allowed as returnTo (no open redirect). */
+function safeReturnTo(v: FormDataEntryValue | null): string {
+  const s = typeof v === "string" ? v : "";
+  return s.startsWith("/organizer/") ? s : "/organizer";
+}
+
+function loginError(code: string, returnTo?: string): never {
+  const rt = returnTo?.startsWith("/organizer/")
+    ? `&returnTo=${encodeURIComponent(returnTo)}`
+    : "";
+  redirect(`/organizer/login?error=${code}${rt}`);
 }
 
 export async function signup(formData: FormData): Promise<void> {
@@ -36,7 +45,8 @@ export async function signup(formData: FormData): Promise<void> {
       password: formData.get("password"),
       name: formData.get("name"),
     });
-  if (!parsed.success) loginError("datos_invalidos");
+  const returnTo = String(formData.get("returnTo") ?? "");
+  if (!parsed.success) loginError("datos_invalidos", returnTo);
   const db = getDb();
   const id = randomId("org");
   const inserted = await db
@@ -49,17 +59,18 @@ export async function signup(formData: FormData): Promise<void> {
     })
     .onConflictDoNothing({ target: organizer.email })
     .returning({ id: organizer.id });
-  if (inserted.length === 0) loginError("email_ya_registrado");
+  if (inserted.length === 0) loginError("email_ya_registrado", returnTo);
   await createSession(id);
-  redirect("/organizer");
+  redirect(safeReturnTo(formData.get("returnTo")));
 }
 
 export async function login(formData: FormData): Promise<void> {
+  const returnTo = String(formData.get("returnTo") ?? "");
   const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
-  if (!parsed.success) loginError("datos_invalidos");
+  if (!parsed.success) loginError("datos_invalidos", returnTo);
   const db = getDb();
   const rows = await db
     .select()
@@ -71,10 +82,10 @@ export async function login(formData: FormData): Promise<void> {
     !org?.passwordHash ||
     !verifyPassword(parsed.data.password, org.passwordHash)
   ) {
-    loginError("credenciales");
+    loginError("credenciales", returnTo);
   }
   await createSession(org.id);
-  redirect("/organizer");
+  redirect(safeReturnTo(formData.get("returnTo")));
 }
 
 export async function logout(): Promise<void> {

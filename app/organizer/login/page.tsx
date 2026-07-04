@@ -14,9 +14,11 @@ const inputCls =
 async function LoginForms({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; returnTo?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, returnTo } = await searchParams;
+  // Only same-site organizer paths survive (mirrors safeReturnTo in the action).
+  const rt = returnTo?.startsWith("/organizer/") ? returnTo : undefined;
   return (
     <>
       {error && (
@@ -24,9 +26,15 @@ async function LoginForms({
           error: {ERRORS[error] ?? error}
         </p>
       )}
+      {rt && (
+        <p className="rounded border border-neutral-700 bg-neutral-900 p-2 text-neutral-400">
+          → log in to continue authorizing the CLI
+        </p>
+      )}
       <section className="space-y-2">
         <p className="text-neutral-500"># I already have an account</p>
         <form action={login} className="space-y-2">
+          {rt && <input type="hidden" name="returnTo" value={rt} />}
           <input
             className={inputCls}
             name="email"
@@ -53,6 +61,7 @@ async function LoginForms({
       <section className="space-y-2">
         <p className="text-neutral-500"># create an organizer account</p>
         <form action={signup} className="space-y-2">
+          {rt && <input type="hidden" name="returnTo" value={rt} />}
           <input
             className={inputCls}
             name="name"
@@ -90,7 +99,7 @@ async function LoginForms({
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; returnTo?: string }>;
 }) {
   return (
     <main className="mx-auto max-w-sm space-y-8 p-8 text-sm">
